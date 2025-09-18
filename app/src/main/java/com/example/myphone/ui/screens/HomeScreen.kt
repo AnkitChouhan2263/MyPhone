@@ -1,9 +1,7 @@
-package com.example.myphone
+package com.example.myphone.ui.screens
 
-import android.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import  androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myphone.ui.theme.DarkBackground
@@ -41,10 +40,6 @@ import com.example.myphone.ui.theme.DarkSecondaryGray
 @Preview
 @Composable
 fun HomeScreen() {
-//    Text(
-//        text = "Hello $name!",
-//        modifier = modifier
-//    )
 
     Column (
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -55,7 +50,7 @@ fun HomeScreen() {
             .padding(8.dp),
 
     ){
-        val l = listOf<String>("All", "Missed","Contacts","Favourites","Unknown", "Non-Spam" , "Spam", )
+        val l = listOf("All", "Missed","Contacts","Favourites","Unknown", "Non-Spam" , "Spam", )
         var selectedItem by rememberSaveable { mutableStateOf("All") }
 
         var isFavouriteExpanded by rememberSaveable { mutableStateOf(true) }
