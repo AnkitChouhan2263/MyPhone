@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- This permission is essential for our new feature -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Permission to read the phone's call log -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
     <application
