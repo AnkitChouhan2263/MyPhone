@@ -27,7 +27,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             _uiState.value = RecentsUiState.Loading
             try {
                 _uiState.value = RecentsUiState.Success(repository.getCallLog())
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.value = RecentsUiState.Error
             }
         }

@@ -50,7 +50,7 @@ fun HomeScreen() {
             .padding(8.dp),
 
     ){
-        val l = listOf("All", "Missed","Contacts","Favourites","Unknown", "Non-Spam" , "Spam", )
+        val l = listOf("All", "Missed","Contacts","Favourites","Unknown", "Non-Spam" , "Spam" )
         var selectedItem by rememberSaveable { mutableStateOf("All") }
 
         var isFavouriteExpanded by rememberSaveable { mutableStateOf(true) }
@@ -65,8 +65,7 @@ fun HomeScreen() {
         Spacer(modifier = Modifier.height(16.dp))
         FavouriteContacts(
             isFavouriteExpanded = isFavouriteExpanded,
-            onDropDown = {isFavouriteExpanded = !isFavouriteExpanded},
-            onViewContacts = {}
+            onDropDown = {isFavouriteExpanded = !isFavouriteExpanded}
         )
     }
 }
@@ -127,13 +126,10 @@ fun Filter(
             .fillMaxWidth()
             .horizontalScroll(state = rememberScrollState())
     ){
-        options.forEach(
-            {
-                FilterTab(selected,it , onItemClick= onItemClick)
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-        )
+        options.forEach {
+            FilterTab(selected, it, onItemClick = onItemClick)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
     }
 }
 
@@ -165,7 +161,6 @@ fun FilterTab(
 fun FavouriteContacts(
     isFavouriteExpanded: Boolean,
     onDropDown: () -> Unit,
-    onViewContacts: Any
 ) {
 
     Row(

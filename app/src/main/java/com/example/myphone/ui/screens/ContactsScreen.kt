@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +29,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myphone.R
 import com.example.myphone.features.contacts.data.Contact
-import com.example.myphone.features.contacts.ui.ContactsViewModel
+import com.example.myphone.features.contacts.data.ContactsViewModel
 import com.example.myphone.navigation.Screen
 
 @Composable
@@ -52,40 +56,64 @@ fun ContactsScreen(
 
     LaunchedEffect(key1 = Unit) {
         if (!hasPermission) {
+            // If we don't have permission, request it.
             permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        } else {
+            // If we DO have permission, call fetchContacts().
+            contactsViewModel.fetchContacts()
         }
     }
 
 
-    if (hasPermission) {
-        LaunchedEffect(key1 = Unit) {
-            contactsViewModel.fetchContacts()
-        }
-        val uiState by contactsViewModel.uiState.collectAsState()
+    val uiState by contactsViewModel.uiState.collectAsState()
+    val searchQuery by contactsViewModel.searchQuery.collectAsState()
 
-        when (val state = uiState) {
-            is ContactsViewModel.ContactsUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            is ContactsViewModel.ContactsUiState.Success -> {
-                ContactsList(
-                    contacts = state.contacts,
-                    onContactClick = { contactId ->
-                        navController.navigate(Screen.ContactDetails.createRoute(contactId))
+    Column(modifier = Modifier.fillMaxSize()) {
+        // --- Search Bar ---
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { contactsViewModel.onSearchQueryChange(it) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            placeholder = { Text("Search contacts") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { contactsViewModel.onSearchQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear Search")
                     }
-                )
-            }
-            is ContactsViewModel.ContactsUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Failed to load contacts.")
+                }
+            },
+            singleLine = true
+        )
+
+        // --- Content Area ---
+        if (hasPermission) {
+            when (val state = uiState) {
+                is ContactsViewModel.ContactsUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                is ContactsViewModel.ContactsUiState.Success -> {
+                    ContactsList(
+                        contacts = state.contacts,
+                        onContactClick = { contactId ->
+                            navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                        }
+                    )
+                }
+                is ContactsViewModel.ContactsUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Failed to load contacts.")
+                    }
                 }
             }
-        }
-    } else {
-        PermissionDeniedContent {
-            permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        } else {
+            PermissionDeniedContent {
+                permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+            }
         }
     }
 }
@@ -103,7 +131,11 @@ fun ContactsList(
                 contact = contact,
                 onClick = { onContactClick(contact.id) }
             )
-            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                thickness = DividerDefaults.Thickness,
+                color = DividerDefaults.color
+            )
         }
     }
 }

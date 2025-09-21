@@ -47,7 +47,7 @@ class ContactDetailsViewModel(
                 // Fetch details for the specific contact ID
                 val details = repository.getContactDetails(contactId)
                 _uiState.value = ContactDetailsUiState.Success(details)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.value = ContactDetailsUiState.Error
             }
         }
