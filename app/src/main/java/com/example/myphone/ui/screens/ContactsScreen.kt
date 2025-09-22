@@ -119,7 +119,9 @@ fun ContactsList(
     onContactClick: (String) -> Unit
 ) {
     LazyColumn {
-        items(results, key = { it.contact.id }) { result ->
+        // UPDATED: The key is now a combination of contact ID and the matched number,
+        // ensuring it's unique even when the same contact appears multiple times.
+        items(results, key = { "${it.contact.id}-${it.matchedNumber}" }) { result ->
             ContactListItem(
                 result = result,
                 onClick = { onContactClick(result.contact.id) }
@@ -154,11 +156,14 @@ fun ContactListItem(
         Spacer(modifier = Modifier.width(16.dp))
 
         Column {
-            Text(text = buildHighlightedText(result.contact.name, result.matchedQuery))
-            // UPDATED: Display the first number from the list for a clean UI.
-            result.contact.numbers.firstOrNull()?.let { firstNumber ->
+            val nameHighlightQuery = if (result.matchedNumber == null) result.matchedQuery else ""
+            Text(text = buildHighlightedText(result.contact.name, nameHighlightQuery))
+            val numberToShow = result.matchedNumber ?: result.contact.numbers.firstOrNull()
+
+            numberToShow?.let { number ->
+                val numberHighlightQuery = if (result.matchedNumber != null) result.matchedQuery else ""
                 Text(
-                    text = buildHighlightedText(firstNumber, result.matchedQuery),
+                    text = buildHighlightedText(number, numberHighlightQuery),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

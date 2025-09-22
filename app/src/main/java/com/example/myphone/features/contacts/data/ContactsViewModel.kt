@@ -8,7 +8,11 @@ import kotlinx.coroutines.launch
 
 class ContactsViewModel(application: Application) : AndroidViewModel(application) {
 
-    data class ContactSearchResult(val contact: Contact, val matchedQuery: String)
+    data class ContactSearchResult(
+        val contact: Contact,
+        val matchedQuery: String,
+        val matchedNumber: String? = null
+    )
 
     sealed interface ContactsUiState {
         object Loading : ContactsUiState
@@ -49,12 +53,29 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
                     val results = contacts.map { ContactSearchResult(it, "") }
                     ContactsUiState.Success(results)
                 } else {
-                    val filteredResults = contacts.mapNotNull { contact ->
-                        findMatch(contact, query)?.let { matchedPart ->
-                            ContactSearchResult(contact, matchedPart)
+                    val trimmedQuery = query.trim()
+                    // Use flatMap to generate a result for each match (name or number).
+                    val filteredResults = contacts.flatMap { contact ->
+                        val resultsForContact = mutableListOf<ContactSearchResult>()
+
+                        // Check for a name match (including initials)
+                        if (matchesName(contact.name, trimmedQuery)) {
+                            resultsForContact.add(ContactSearchResult(contact, trimmedQuery, null))
                         }
+
+                        // Check for number matches
+                        val digitsOnlyQuery = trimmedQuery.replace(Regex("\\D"), "")
+                        if (digitsOnlyQuery.isNotEmpty()) {
+                            contact.numbers
+                                .filter { it.replace(Regex("\\D"), "").contains(digitsOnlyQuery) }
+                                .forEach { matchingNumber ->
+                                    resultsForContact.add(ContactSearchResult(contact, trimmedQuery, matchingNumber))
+                                }
+                        }
+                        resultsForContact
                     }
-                    ContactsUiState.Success(filteredResults)
+                    // Use distinct() to prevent showing the same result twice (e.g., if name and number both match the same query)
+                    ContactsUiState.Success(filteredResults.distinct())
                 }
             }.collect { filteredState ->
                 _uiState.value = filteredState
@@ -62,35 +83,18 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun findMatch(contact: Contact, query: String): String? {
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) return null
-
-        if (contact.name.contains(trimmedQuery, ignoreCase = true)) {
-            return trimmedQuery
+    private fun matchesName(name: String, query: String): Boolean {
+        if (name.contains(query, ignoreCase = true)) {
+            return true
         }
-
-        val digitsOnlyQuery = trimmedQuery.replace(Regex("\\D"), "")
-        if (digitsOnlyQuery.isNotEmpty()) {
-            // UPDATED: Check if ANY number in the list matches the query.
-            if (contact.numbers.any { it.replace(Regex("\\D"), "").contains(digitsOnlyQuery) }) {
-                return trimmedQuery
-            }
-        }
-
-        val queryParts = trimmedQuery.split(" ").filter { it.isNotBlank() }
-        val nameParts = contact.name.split(" ").filter { it.isNotBlank() }
-
+        val queryParts = query.split(" ").filter { it.isNotBlank() }
+        val nameParts = name.split(" ").filter { it.isNotBlank() }
         if (queryParts.isNotEmpty() && nameParts.isNotEmpty()) {
-            val allInitialsMatch = queryParts.all { queryPart ->
+            return queryParts.all { queryPart ->
                 nameParts.any { namePart -> namePart.startsWith(queryPart, ignoreCase = true) }
             }
-            if (allInitialsMatch) {
-                return trimmedQuery
-            }
         }
-
-        return null
+        return false
     }
 }
 
