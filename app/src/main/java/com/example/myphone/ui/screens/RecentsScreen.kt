@@ -30,6 +30,7 @@ import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.features.recents.ui.RecentsViewModel
 import androidx.core.net.toUri
+import com.example.myphone.ui.components.EmptyState
 
 @Composable
 fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
@@ -69,25 +70,33 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
                 }
             }
             is RecentsViewModel.RecentsUiState.Success -> {
-                CallLogList(callLog = state.callLog)
+                if (state.callLog.isNotEmpty()) {
+                    CallLogList(callLog = state.callLog)
+                } else {
+                    EmptyState(
+                        title = "No recent calls",
+                        message = "Your call history will appear here.",
+                        icon = Icons.Default.History
+                    )
+                }
             }
             is RecentsViewModel.RecentsUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Failed to load call log.")
-                }
+                EmptyState(
+                    title = "Error",
+                    message = "Failed to load your call log. Please try again later.",
+                    icon = Icons.Default.Warning
+                )
             }
         }
     } else {
-        // Show a UI to explain why the permission is needed
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Permission needed to show call log.")
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { permissionLauncher.launch(Manifest.permission.READ_CALL_LOG) }) {
-                    Text("Grant Permission")
-                }
-            }
-        }
+        // UPDATED: Replaced the old Box with the reusable EmptyState
+        EmptyState(
+            title = "Permission needed",
+            message = "This app needs to read your call log to display your history.",
+            icon = Icons.Default.History,
+            actionText = "Grant Permission",
+            onAction = { permissionLauncher.launch(Manifest.permission.READ_CALL_LOG) }
+        )
     }
 }
 

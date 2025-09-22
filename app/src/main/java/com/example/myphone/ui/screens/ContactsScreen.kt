@@ -19,7 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -49,6 +52,7 @@ import androidx.navigation.NavController
 import com.example.myphone.features.contacts.data.ContactsViewModel
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
+import com.example.myphone.ui.components.EmptyState
 
 @Composable
 fun ContactsScreen(
@@ -109,23 +113,47 @@ fun ContactsScreen(
                     }
                 }
                 is ContactsViewModel.ContactsUiState.Success -> {
-                    ContactsList(
-                        results = state.results,
-                        onContactClick = { contactId ->
-                            navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                    if (state.results.isNotEmpty()) {
+                        ContactsList(
+                            results = state.results,
+                            onContactClick = { contactId ->
+                                navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                            }
+                        )
+                    } else {
+                        // Handle both empty list and no search results scenarios
+                        if (searchQuery.isNotBlank()) {
+                            EmptyState(
+                                title = "No results found",
+                                message = "Try a different name or number.",
+                                icon = Icons.Default.SearchOff
+                            )
+                        } else {
+                            EmptyState(
+                                title = "No contacts",
+                                message = "Your contact list is empty.",
+                                icon = Icons.Default.People
+                            )
                         }
-                    )
+                    }
                 }
                 is ContactsViewModel.ContactsUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Failed to load contacts.")
-                    }
+                    EmptyState(
+                        title = "Error",
+                        message = "Failed to load your contacts. Please try again later.",
+                        icon = Icons.Default.Warning
+                    )
                 }
             }
         } else {
-            PermissionDeniedContent {
-                permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-            }
+            // UPDATED: Replaced PermissionDeniedContent with the reusable EmptyState
+            EmptyState(
+                title = "Permission needed",
+                message = "This app needs to read your contacts to display them.",
+                icon = Icons.Default.People,
+                actionText = "Grant Permission",
+                onAction = { permissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
+            )
         }
     }
 }
