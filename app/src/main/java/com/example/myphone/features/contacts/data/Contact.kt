@@ -1,10 +1,17 @@
 package com.example.myphone.features.contacts.data
 
-// This is a simple data class (a model) that represents a single contact.
-// Using a data class gives us helpful functions like equals(), hashCode(), and toString() for free.
+/**
+ * Represents a single contact entry for the main list.
+ *
+ * @param id The unique ID of the contact.
+ * @param name The contact's display name.
+ * @param photoUri A string URI for the contact's photo, if available.
+ * @param numbers A list of all phone numbers associated with the contact.
+ */
 data class Contact(
     val id: String,
     val name: String,
-    // A contact might not have a photo, so we make this nullable.
-    val photoUri: String? = null
+    val photoUri: String? = null,
+    val numbers: List<String> = emptyList()
 )
+

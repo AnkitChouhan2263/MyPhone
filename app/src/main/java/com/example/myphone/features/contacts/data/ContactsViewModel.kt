@@ -8,37 +8,29 @@ import kotlinx.coroutines.launch
 
 class ContactsViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Sealed interface for the main UI state (Loading, Error, Success).
+    data class ContactSearchResult(val contact: Contact, val matchedQuery: String)
+
     sealed interface ContactsUiState {
         object Loading : ContactsUiState
-        data class Success(val contacts: List<Contact>) : ContactsUiState
+        data class Success(val results: List<ContactSearchResult>) : ContactsUiState
         object Error : ContactsUiState
     }
 
     private val repository = ContactsRepository(application.contentResolver)
-
-    // Private state for holding the search query.
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
-    // Private state for holding the full, unfiltered list of contacts.
     private val _allContacts = MutableStateFlow<List<Contact>>(emptyList())
-
-    // The main UI state exposed to the screen.
     private val _uiState = MutableStateFlow<ContactsUiState>(ContactsUiState.Loading)
     val uiState: StateFlow<ContactsUiState> = _uiState
 
-    // When the ViewModel is created, fetch the contacts.
     fun fetchContacts() {
         viewModelScope.launch {
             _uiState.value = ContactsUiState.Loading
             try {
-                // Fetch the full list and store it in _allContacts.
                 val contacts = repository.getContacts()
                 _allContacts.value = contacts
-                // Initial state is Success with the full list.
-                _uiState.value = ContactsUiState.Success(contacts)
-                // Start observing changes to the search query to filter the list.
+                val initialResults = contacts.map { ContactSearchResult(it, "") }
+                _uiState.value = ContactsUiState.Success(initialResults)
                 observeSearchQuery()
             } catch (_: Exception) {
                 _uiState.value = ContactsUiState.Error
@@ -46,31 +38,59 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // Function to update the search query from the UI.
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
     }
 
     private fun observeSearchQuery() {
         viewModelScope.launch {
-            // 'combine' is a powerful flow operator. It listens to changes in both
-            // the search query and the full contact list. If either changes,
-            // it re-runs the logic to produce a new, filtered list.
             searchQuery.combine(_allContacts) { query, contacts ->
                 if (query.isBlank()) {
-                    // If the query is empty, show the full list.
-                    ContactsUiState.Success(contacts)
+                    val results = contacts.map { ContactSearchResult(it, "") }
+                    ContactsUiState.Success(results)
                 } else {
-                    // Otherwise, filter the list.
-                    val filteredList = contacts.filter {
-                        it.name.contains(query, ignoreCase = true)
+                    val filteredResults = contacts.mapNotNull { contact ->
+                        findMatch(contact, query)?.let { matchedPart ->
+                            ContactSearchResult(contact, matchedPart)
+                        }
                     }
-                    ContactsUiState.Success(filteredList)
+                    ContactsUiState.Success(filteredResults)
                 }
             }.collect { filteredState ->
-                // Emit the new filtered state to the UI.
                 _uiState.value = filteredState
             }
         }
     }
+
+    private fun findMatch(contact: Contact, query: String): String? {
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isBlank()) return null
+
+        if (contact.name.contains(trimmedQuery, ignoreCase = true)) {
+            return trimmedQuery
+        }
+
+        val digitsOnlyQuery = trimmedQuery.replace(Regex("\\D"), "")
+        if (digitsOnlyQuery.isNotEmpty()) {
+            // UPDATED: Check if ANY number in the list matches the query.
+            if (contact.numbers.any { it.replace(Regex("\\D"), "").contains(digitsOnlyQuery) }) {
+                return trimmedQuery
+            }
+        }
+
+        val queryParts = trimmedQuery.split(" ").filter { it.isNotBlank() }
+        val nameParts = contact.name.split(" ").filter { it.isNotBlank() }
+
+        if (queryParts.isNotEmpty() && nameParts.isNotEmpty()) {
+            val allInitialsMatch = queryParts.all { queryPart ->
+                nameParts.any { namePart -> namePart.startsWith(queryPart, ignoreCase = true) }
+            }
+            if (allInitialsMatch) {
+                return trimmedQuery
+            }
+        }
+
+        return null
+    }
 }
+

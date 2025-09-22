@@ -8,12 +8,14 @@ import kotlinx.coroutines.withContext
 class ContactsRepository(private val contentResolver: ContentResolver) {
 
     suspend fun getContacts(): List<Contact> = withContext(Dispatchers.IO) {
-        val contacts = mutableListOf<Contact>()
+        // Use a map to group numbers by contact ID to handle multiple numbers per contact.
+        val contactsMap = mutableMapOf<String, Contact>()
 
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-            ContactsContract.CommonDataKinds.Phone.PHOTO_URI
+            ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
+            ContactsContract.CommonDataKinds.Phone.NUMBER
         )
 
         val cursor = contentResolver.query(
@@ -21,22 +23,43 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
             projection,
             null,
             null,
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
+            null // No initial sort, we will sort the final list in memory.
         )
 
         cursor?.use {
             val idColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
             val nameColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
             val photoUriColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+            val numberColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
 
             while (it.moveToNext()) {
                 val id = it.getString(idColumn)
                 val name = it.getString(nameColumn)
                 val photoUri = it.getString(photoUriColumn)
-                contacts.add(Contact(id, name, photoUri))
+                val number = it.getString(numberColumn)
+
+                val existingContact = contactsMap[id]
+
+                if (existingContact == null) {
+                    // First time we've seen this contact ID, create a new entry.
+                    contactsMap[id] = Contact(
+                        id = id,
+                        name = name,
+                        photoUri = photoUri,
+                        numbers = listOfNotNull(number)
+                    )
+                } else {
+                    // We've seen this contact before, add the new number to its list.
+                    if (number != null) {
+                        contactsMap[id] = existingContact.copy(
+                            numbers = existingContact.numbers + number
+                        )
+                    }
+                }
             }
         }
-        return@withContext contacts.distinctBy { it.id }
+        // Convert the map's values to a list and sort it alphabetically by name.
+        return@withContext contactsMap.values.sortedBy { it.name }
     }
 
     suspend fun getContactDetails(contactId: String): ContactDetails = withContext(Dispatchers.IO) {
@@ -73,7 +96,6 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
         phoneCursor?.use {
             val numberColumn = it.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER)
             while (it.moveToNext()) {
-                // NORMALIZE the number before adding it to the list.
                 val rawNumber = it.getString(numberColumn)
                 phoneNumbers.add(normalizePhoneNumber(rawNumber))
             }
@@ -81,15 +103,10 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
         return@withContext ContactDetails(contactId, name, photoUri, phoneNumbers.distinct())
     }
 
-    /**
-     * Helper function to clean phone numbers.
-     * It removes all non-digit characters except for a leading '+'.
-     * Example: "+91 (000) 000-0000" becomes "+910000000000"
-     */
     private fun normalizePhoneNumber(number: String): String {
         val isInternational = number.startsWith("+")
-        // This regex removes anything that isn't a digit.
         val digitsOnly = number.replace(Regex("\\D"), "")
         return if (isInternational) "+$digitsOnly" else digitsOnly
     }
 }
+

@@ -13,14 +13,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,7 +30,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myphone.R
-import com.example.myphone.features.contacts.data.Contact
 import com.example.myphone.features.contacts.data.ContactsViewModel
 import com.example.myphone.navigation.Screen
 
@@ -46,7 +47,6 @@ fun ContactsScreen(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
@@ -54,29 +54,25 @@ fun ContactsScreen(
         }
     )
 
-    LaunchedEffect(key1 = Unit) {
+    LaunchedEffect(key1 = hasPermission) {
         if (!hasPermission) {
-            // If we don't have permission, request it.
             permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
         } else {
-            // If we DO have permission, call fetchContacts().
             contactsViewModel.fetchContacts()
         }
     }
-
 
     val uiState by contactsViewModel.uiState.collectAsState()
     val searchQuery by contactsViewModel.searchQuery.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // --- Search Bar ---
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { contactsViewModel.onSearchQueryChange(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            placeholder = { Text("Search contacts") },
+            placeholder = { Text("Search contacts & numbers") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
@@ -88,7 +84,6 @@ fun ContactsScreen(
             singleLine = true
         )
 
-        // --- Content Area ---
         if (hasPermission) {
             when (val state = uiState) {
                 is ContactsViewModel.ContactsUiState.Loading -> {
@@ -98,7 +93,7 @@ fun ContactsScreen(
                 }
                 is ContactsViewModel.ContactsUiState.Success -> {
                     ContactsList(
-                        contacts = state.contacts,
+                        results = state.results,
                         onContactClick = { contactId ->
                             navController.navigate(Screen.ContactDetails.createRoute(contactId))
                         }
@@ -120,21 +115,14 @@ fun ContactsScreen(
 
 @Composable
 fun ContactsList(
-    contacts: List<Contact>,
+    results: List<ContactsViewModel.ContactSearchResult>,
     onContactClick: (String) -> Unit
 ) {
-    LazyColumn(
-        contentPadding = PaddingValues(vertical = 8.dp)
-    ) {
-        items(contacts) { contact ->
+    LazyColumn {
+        items(results, key = { it.contact.id }) { result ->
             ContactListItem(
-                contact = contact,
-                onClick = { onContactClick(contact.id) }
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                thickness = DividerDefaults.Thickness,
-                color = DividerDefaults.color
+                result = result,
+                onClick = { onContactClick(result.contact.id) }
             )
         }
     }
@@ -142,50 +130,73 @@ fun ContactsList(
 
 @Composable
 fun ContactListItem(
-    contact: Contact,
+    result: ContactsViewModel.ContactSearchResult,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(contact.photoUri)
+                .data(result.contact.photoUri)
                 .error(R.drawable.ic_launcher_foreground)
                 .crossfade(true)
                 .build(),
-            contentDescription = "${contact.name}'s photo",
-            contentScale = ContentScale.Crop,
+            contentDescription = "${result.contact.name}'s photo",
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
         )
         Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = contact.name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium
-        )
+
+        Column {
+            Text(text = buildHighlightedText(result.contact.name, result.matchedQuery))
+            // UPDATED: Display the first number from the list for a clean UI.
+            result.contact.numbers.firstOrNull()?.let { firstNumber ->
+                Text(
+                    text = buildHighlightedText(firstNumber, result.matchedQuery),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun buildHighlightedText(fullText: String, query: String): AnnotatedString {
+    return buildAnnotatedString {
+        append(fullText)
+        if (query.isNotBlank()) {
+            val startIndex = fullText.indexOf(query, ignoreCase = true)
+            if (startIndex >= 0) {
+                val endIndex = startIndex + query.length
+                addStyle(
+                    style = SpanStyle(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    ),
+                    start = startIndex,
+                    end = endIndex
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun PermissionDeniedContent(onRequestPermission: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Permission Required", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("This app needs access to your contacts to display them.")
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRequestPermission) {
-            Text("Grant Permission")
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+            Text("Permission needed to show contacts.", textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onRequestPermission) {
+                Text("Grant Permission")
+            }
         }
     }
 }
