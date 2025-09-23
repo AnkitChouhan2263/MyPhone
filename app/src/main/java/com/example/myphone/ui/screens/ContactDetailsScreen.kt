@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +44,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.myphone.features.contacts.ui.ContactDetailsViewModel
+import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +57,14 @@ fun ContactDetailsScreen(
 ) {
     val uiState by contactDetailsViewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    // This is the definitive fix. This LaunchedEffect is keyed to the unique
+    // navigation instance. It is GUARANTEED to run every time you navigate
+    // to this screen, telling the ViewModel to fetch fresh data.
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(key1 = currentBackStackEntry) {
+        contactDetailsViewModel.loadContactDetails()
+    }
 
     // --- Start of Call Permission Logic ---
     var hasCallPermission by remember {
@@ -79,6 +91,19 @@ fun ContactDetailsScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                // UPDATED: Added an Edit button to the actions.
+                actions = {
+                    // UPDATED: Check if the UI state is Success to safely access the contactId.
+                    if (uiState is ContactDetailsViewModel.ContactDetailsUiState.Success) {
+                        // Extract the contactId from the success state.
+                        val contactId = (uiState as ContactDetailsViewModel.ContactDetailsUiState.Success).contactDetails.id
+                        IconButton(onClick = {
+                            navController.navigate(Screen.EditContact.createRoute(contactId))
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Contact")
+                        }
                     }
                 }
             )

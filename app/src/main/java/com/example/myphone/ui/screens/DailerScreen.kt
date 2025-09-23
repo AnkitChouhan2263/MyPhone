@@ -156,7 +156,11 @@ fun DialerScreen(dialerViewModel: DialerViewModel = viewModel()) {
 
             // Delete Button
             IconButton(
-                onClick = { dialerViewModel.onAction(DialerAction.Delete) },
+                onClick = {
+                    if (uiState.enteredNumber.isNotEmpty()) {
+                        dialerViewModel.onAction(DialerAction.Delete)
+                    }
+                },
                 modifier = Modifier.size(72.dp)
             ) {
                 Icon(

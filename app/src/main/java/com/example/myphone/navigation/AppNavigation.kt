@@ -22,9 +22,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.myphone.ui.screens.AddContactScreen
 import com.example.myphone.ui.screens.ContactDetailsScreen
 import com.example.myphone.ui.screens.ContactsScreen
 import com.example.myphone.ui.screens.DialerScreen
+import com.example.myphone.ui.screens.EditContactScreen
 import com.example.myphone.ui.screens.HomeScreen
 import com.example.myphone.ui.screens.RecentsScreen
 
@@ -33,6 +35,11 @@ sealed class Screen(val route: String) {
     object Recents : Screen("recents")
     object Dialer : Screen("keypad")
     object Contacts : Screen("contacts")
+    // NEW: Two separate, distinct routes for Add and Edit.
+    object AddContact : Screen("add_contact")
+    object EditContact : Screen("edit_contact/{contactId}") {
+        fun createRoute(contactId: String) = "edit_contact/$contactId"
+    }
     object ContactDetails : Screen("contacts/{contactId}") {
         fun createRoute(contactId: String) = "contacts/$contactId"
     }
@@ -62,6 +69,19 @@ fun AppNavigation() {
             composable(Screen.Dialer.route) { DialerScreen() }
             composable(Screen.Contacts.route) {
                 ContactsScreen(navController = navController)
+            }
+            // NEW: Separate composable destinations.
+            composable(Screen.AddContact.route) {
+                AddContactScreen(navController = navController)
+            }
+            composable(
+                route = Screen.EditContact.route,
+                arguments = listOf(navArgument("contactId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                EditContactScreen(
+                    navController = navController,
+                    backStackEntry = backStackEntry
+                )
             }
             composable(
                 route = Screen.ContactDetails.route,

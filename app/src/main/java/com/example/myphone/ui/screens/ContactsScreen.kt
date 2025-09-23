@@ -11,24 +11,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,7 +45,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,10 +75,9 @@ fun ContactsScreen(
         }
     )
 
-    LaunchedEffect(key1 = hasPermission) {
-        if (!hasPermission) {
-            permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-        } else {
+    // A LaunchedEffect that refetches contacts when the user navigates back to the screen.
+    LaunchedEffect(navController.currentBackStackEntry) {
+        if (hasPermission) {
             contactsViewModel.fetchContacts()
         }
     }
@@ -86,74 +85,88 @@ fun ContactsScreen(
     val uiState by contactsViewModel.uiState.collectAsState()
     val searchQuery by contactsViewModel.searchQuery.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { contactsViewModel.onSearchQueryChange(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            placeholder = { Text("Search contacts & numbers") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { contactsViewModel.onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear Search")
-                    }
-                }
-            },
-            singleLine = true
-        )
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                // Navigate to the new, specific AddContact route
+                navController.navigate(Screen.AddContact.route)
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Contact")
+            }
+        }
+    ){ padding ->
 
-        if (hasPermission) {
-            when (val state = uiState) {
-                is ContactsViewModel.ContactsUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                is ContactsViewModel.ContactsUiState.Success -> {
-                    if (state.results.isNotEmpty()) {
-                        ContactsList(
-                            results = state.results,
-                            onContactClick = { contactId ->
-                                navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                            }
-                        )
-                    } else {
-                        // Handle both empty list and no search results scenarios
-                        if (searchQuery.isNotBlank()) {
-                            EmptyState(
-                                title = "No results found",
-                                message = "Try a different name or number.",
-                                icon = Icons.Default.SearchOff
-                            )
-                        } else {
-                            EmptyState(
-                                title = "No contacts",
-                                message = "Your contact list is empty.",
-                                icon = Icons.Default.People
-                            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { contactsViewModel.onSearchQueryChange(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                placeholder = { Text("Search contacts & numbers") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { contactsViewModel.onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear Search")
                         }
                     }
-                }
-                is ContactsViewModel.ContactsUiState.Error -> {
-                    EmptyState(
-                        title = "Error",
-                        message = "Failed to load your contacts. Please try again later.",
-                        icon = Icons.Default.Warning
-                    )
-                }
-            }
-        } else {
-            // UPDATED: Replaced PermissionDeniedContent with the reusable EmptyState
-            EmptyState(
-                title = "Permission needed",
-                message = "This app needs to read your contacts to display them.",
-                icon = Icons.Default.People,
-                actionText = "Grant Permission",
-                onAction = { permissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
+                },
+                singleLine = true
             )
+
+            if (hasPermission) {
+                when (val state = uiState) {
+                    is ContactsViewModel.ContactsUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    is ContactsViewModel.ContactsUiState.Success -> {
+                        if (state.results.isNotEmpty()) {
+                            ContactsList(
+                                results = state.results,
+                                onContactClick = { contactId ->
+                                    navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                                }
+                            )
+                        } else {
+                            if (searchQuery.isNotBlank()) {
+                                EmptyState(
+                                    title = "No results found",
+                                    message = "Try a different name or number.",
+                                    icon = Icons.Default.SearchOff
+                                )
+                            } else {
+                                EmptyState(
+                                    title = "No contacts",
+                                    message = "Your contact list is empty.",
+                                    icon = Icons.Default.People
+                                )
+                            }
+                        }
+                    }
+                    is ContactsViewModel.ContactsUiState.Error -> {
+                        EmptyState(
+                            title = "Error",
+                            message = "Failed to load your contacts. Please try again later.",
+                            icon = Icons.Default.Warning
+                        )
+                    }
+                }
+            } else {
+                EmptyState(
+                    title = "Permission needed",
+                    message = "This app needs to read your contacts to display them.",
+                    icon = Icons.Default.People,
+                    actionText = "Grant Permission",
+                    onAction = { permissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
+                )
+            }
         }
     }
 }
@@ -228,19 +241,6 @@ private fun buildHighlightedText(fullText: String, query: String): AnnotatedStri
                     start = startIndex,
                     end = endIndex
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun PermissionDeniedContent(onRequestPermission: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-            Text("Permission needed to show contacts.", textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onRequestPermission) {
-                Text("Grant Permission")
             }
         }
     }

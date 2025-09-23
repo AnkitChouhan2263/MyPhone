@@ -7,6 +7,8 @@
         android:name="android.hardware.telephony"
         android:required="false" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Permission to write or modify contacts -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- This permission is essential for our new feature -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <!-- Permission to read the phone's call log -->
