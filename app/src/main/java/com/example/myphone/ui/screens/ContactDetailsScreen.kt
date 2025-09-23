@@ -19,9 +19,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.myphone.features.contacts.ui.ContactDetailsViewModel
+import com.example.myphone.features.contacts.ui.DetailsAction
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 
@@ -64,6 +72,13 @@ fun ContactDetailsScreen(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     LaunchedEffect(key1 = currentBackStackEntry) {
         contactDetailsViewModel.loadContactDetails()
+    }
+
+    // Effect to navigate back after successful deletion
+    LaunchedEffect(key1 = uiState.contactDeleted) {
+        if (uiState.contactDeleted) {
+            navController.navigateUp()
+        }
     }
 
     // --- Start of Call Permission Logic ---
@@ -95,84 +110,141 @@ fun ContactDetailsScreen(
                 },
                 // UPDATED: Added an Edit button to the actions.
                 actions = {
-                    // UPDATED: Check if the UI state is Success to safely access the contactId.
-                    if (uiState is ContactDetailsViewModel.ContactDetailsUiState.Success) {
-                        // Extract the contactId from the success state.
-                        val contactId = (uiState as ContactDetailsViewModel.ContactDetailsUiState.Success).contactDetails.id
+                    if (uiState.contactDetails != null) {
+                        // Edit button
                         IconButton(onClick = {
-                            navController.navigate(Screen.EditContact.createRoute(contactId))
+                            navController.navigate(Screen.EditContact.createRoute(uiState.contactDetails!!.id))
                         }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit Contact")
                         }
+                        // Dropdown menu for Delete
+                        TopBarDropdownMenu(onDelete = {
+                            contactDetailsViewModel.onAction(DetailsAction.ShowDeleteDialog)
+                        })
                     }
                 }
             )
         }
     ) { padding ->
+
+        // Show confirmation dialog if needed
+        if (uiState.showDeleteConfirmDialog) {
+            DeleteConfirmationDialog(
+                onConfirm = { contactDetailsViewModel.onAction(DetailsAction.ConfirmDelete) },
+                onDismiss = { contactDetailsViewModel.onAction(DetailsAction.HideDeleteDialog) }
+            )
+        }
+
         Box(modifier = Modifier.padding(padding)) {
-            when (val state = uiState) {
-                is ContactDetailsViewModel.ContactDetailsUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-                is ContactDetailsViewModel.ContactDetailsUiState.Success -> {
-                    val details = state.contactDetails
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        contentPadding = PaddingValues(16.dp)
-                    ) {
-                        // Contact Photo and Name
-                        item {
-                            Spacer(modifier = Modifier.height(32.dp))
-                            // UPDATED: Replaced AsyncImage with our new smart ContactAvatar component.
-                            ContactAvatar(
-                                name = details.name,
-                                photoUri = details.photoUri,
-                                modifier = Modifier.size(120.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(text = details.name, style = MaterialTheme.typography.headlineMedium)
-                            Spacer(modifier = Modifier.height(32.dp))
+            }
+            else if (uiState.contactDetails != null) {
+                val details = uiState.contactDetails!!
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    // Contact Photo and Name
+                    item {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        // UPDATED: Replaced AsyncImage with our new smart ContactAvatar component.
+                        ContactAvatar(
+                            name = details.name,
+                            photoUri = details.photoUri,
+                            modifier = Modifier.size(120.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = details.name, style = MaterialTheme.typography.headlineMedium)
+                        Spacer(modifier = Modifier.height(32.dp))
 
-                        }
+                    }
 
-                        // Phone Numbers
-                        items(details.phoneNumbers) { number ->
-                            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = number,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(onClick = {
-                                        if (hasCallPermission) {
-                                            val intent =
-                                                Intent(Intent.ACTION_CALL, "tel:$number".toUri())
-                                            context.startActivity(intent)
-                                        } else {
-                                            callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.Call, contentDescription = "Call")
+                    // Phone Numbers
+                    items(details.phoneNumbers) { number ->
+                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = number,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = {
+                                    if (hasCallPermission) {
+                                        val intent =
+                                            Intent(Intent.ACTION_CALL, "tel:$number".toUri())
+                                        context.startActivity(intent)
+                                    } else {
+                                        callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
                                     }
+                                }) {
+                                    Icon(Icons.Default.Call, contentDescription = "Call")
                                 }
                             }
                         }
                     }
                 }
-                is ContactDetailsViewModel.ContactDetailsUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Failed to load contact details.")
-                    }
+            }
+            else if (uiState.error != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.error!!)
                 }
             }
         }
     }
 }
+
+@Composable
+fun TopBarDropdownMenu(onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = "Delete") }
+            )
+        }
+    }
+}
+
+@Composable
+fun DeleteConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Contact") },
+        text = { Text("Are you sure you want to permanently delete this contact?") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+
 

@@ -275,6 +275,29 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
     }
 
     /**
+     * Deletes a contact from the device based on its contact ID.
+     * This is a destructive and irreversible operation.
+     */
+    suspend fun deleteContact(contactId: String): Boolean = withContext(Dispatchers.IO) {
+        val selection = "${ContactsContract.RawContacts.CONTACT_ID} = ?"
+        val selectionArgs = arrayOf(contactId)
+
+        return@withContext try {
+            // Deleting the raw contact also deletes all associated data (name, phone, etc.)
+            val rowsDeleted = contentResolver.delete(
+                ContactsContract.RawContacts.CONTENT_URI,
+                selection,
+                selectionArgs
+            )
+            // Return true if at least one row was successfully deleted.
+            rowsDeleted > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /**
      * Helper function to find a RawContact ID for a given Contact ID.
      * This is necessary to correctly link new data rows to an existing contact.
      */

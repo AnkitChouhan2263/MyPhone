@@ -8,6 +8,8 @@ import com.example.myphone.features.contacts.data.ContactDetails
 import com.example.myphone.features.contacts.data.ContactsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ContactDetailsViewModel(
@@ -15,40 +17,77 @@ class ContactDetailsViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
-    sealed interface ContactDetailsUiState {
-        object Loading : ContactDetailsUiState
-        data class Success(val contactDetails: ContactDetails) : ContactDetailsUiState
-        object Error : ContactDetailsUiState
+    // Add a new sealed interface for UI events to handle navigation.
+    sealed interface UiEvent {
+        object NavigateBack : UiEvent
     }
 
-    private val _uiState = MutableStateFlow<ContactDetailsUiState>(ContactDetailsUiState.Loading)
-    val uiState: StateFlow<ContactDetailsUiState> = _uiState
+    data class ContactDetailsState(
+        val isLoading: Boolean = true,
+        val contactDetails: ContactDetails? = null,
+        val error: String? = null,
+        val showDeleteConfirmDialog: Boolean = false,
+        val contactDeleted: Boolean = false
+    )
+
+    private val _uiState = MutableStateFlow(ContactDetailsState())
+    val uiState: StateFlow<ContactDetailsState> = _uiState.asStateFlow()
 
     private val repository = ContactsRepository(application.contentResolver)
-
-    // The init block is now empty. The UI layer is now in control of when to load data.
-    init {}
 
     /**
      * Public function that can be called by the UI to load or reload the contact's details.
      * This is the key to ensuring the data is always fresh.
      */
     fun loadContactDetails() {
-        val contactId: String? = savedStateHandle.get("contactId")
+        val contactId: String? = savedStateHandle["contactId"]
         if (contactId == null) {
-            _uiState.value = ContactDetailsUiState.Error
+            _uiState.update { it.copy(isLoading = false, error = "Contact not found.") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.value = ContactDetailsUiState.Loading
+            _uiState.update { it.copy(isLoading = true) }
             try {
                 val details = repository.getContactDetails(contactId)
-                _uiState.value = ContactDetailsUiState.Success(details)
+                _uiState.update { it.copy(isLoading = false, contactDetails = details) }
             } catch (_: Exception) {
-                _uiState.value = ContactDetailsUiState.Error
+                _uiState.update { it.copy(isLoading = false, error = "Failed to load details.") }
             }
         }
     }
+
+    fun onAction(action: DetailsAction) {
+        when (action) {
+            DetailsAction.ShowDeleteDialog -> _uiState.update { it.copy(showDeleteConfirmDialog = true) }
+            DetailsAction.HideDeleteDialog -> _uiState.update { it.copy(showDeleteConfirmDialog = false) }
+            DetailsAction.ConfirmDelete -> deleteContact()
+        }
+    }
+
+    private fun deleteContact() {
+        val contactId: String? = savedStateHandle["contactId"]
+        if (contactId == null) {
+            // Cannot delete if we don't know the ID
+            _uiState.update { it.copy(showDeleteConfirmDialog = false) }
+            return
+        }
+        viewModelScope.launch {
+            val success = repository.deleteContact(contactId)
+            if (success) {
+                _uiState.update { it.copy(contactDeleted = true, showDeleteConfirmDialog = false) }
+            } else {
+                // Optionally handle the error case, e.g., show a toast
+                _uiState.update { it.copy(showDeleteConfirmDialog = false) }
+            }
+        }
+    }
+}
+
+// A new sealed interface for actions on this screen
+sealed interface DetailsAction {
+    object ShowDeleteDialog : DetailsAction
+    object HideDeleteDialog : DetailsAction
+    object ConfirmDelete : DetailsAction
 }
 
