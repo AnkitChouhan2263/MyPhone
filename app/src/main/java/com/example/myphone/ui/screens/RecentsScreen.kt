@@ -5,7 +5,14 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -13,10 +20,23 @@ import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,17 +45,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.features.recents.ui.RecentsViewModel
-import androidx.core.net.toUri
 import com.example.myphone.ui.components.EmptyState
 
 @Composable
 fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
     val context = LocalContext.current
-    var hasPermission by remember {
+    // --- Permission for READING the call log ---
+    var hasReadPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
@@ -43,21 +64,38 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val readPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
-            hasPermission = isGranted
+            hasReadPermission = isGranted
+        }
+    )
+
+    // --- Permission for MAKING calls (THE FIX) ---
+    var hasCallPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CALL_PHONE
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            hasCallPermission = isGranted
         }
     )
 
     // Request permission when the screen is first composed
     LaunchedEffect(key1 = Unit) {
-        if (!hasPermission) {
-            permissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
+        if (!hasReadPermission) {
+            readPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
         }
     }
 
-    if (hasPermission) {
+
+    if (hasReadPermission) {
         // Fetch recents if permission is granted
         LaunchedEffect(key1 = Unit) {
             recentsViewModel.fetchRecents()
@@ -71,7 +109,18 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
             }
             is RecentsViewModel.RecentsUiState.Success -> {
                 if (state.callLog.isNotEmpty()) {
-                    CallLogList(callLog = state.callLog)
+                    CallLogList(
+                        callLog = state.callLog,
+                        onCall = { number ->
+                            // THE FIX: Check for call permission before making the call.
+                            if (hasCallPermission) {
+                                val intent = Intent(Intent.ACTION_CALL, "tel:$number".toUri())
+                                context.startActivity(intent)
+                            } else {
+                                callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                            }
+                        }
+                    )
                 } else {
                     EmptyState(
                         title = "No recent calls",
@@ -89,27 +138,22 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
             }
         }
     } else {
-        // UPDATED: Replaced the old Box with the reusable EmptyState
         EmptyState(
             title = "Permission needed",
             message = "This app needs to read your call log to display your history.",
             icon = Icons.Default.History,
             actionText = "Grant Permission",
-            onAction = { permissionLauncher.launch(Manifest.permission.READ_CALL_LOG) }
+            onAction = { readPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG) }
         )
     }
 }
 
 @Composable
-fun CallLogList(callLog: List<CallLogEntry>) {
-    val context = LocalContext.current
+fun CallLogList(callLog: List<CallLogEntry>, onCall: (String) -> Unit) {
     LazyColumn(modifier = Modifier.padding(16.dp)) {
         items(callLog) { entry ->
-            CallLogItem(entry = entry, onCall = { number ->
-                // No need to request permission here as we can't get to this screen without it.
-                val intent = Intent(Intent.ACTION_CALL, "tel:$number".toUri())
-                context.startActivity(intent)
-            })
+            // Pass the onCall lambda down to the item.
+            CallLogItem(entry = entry, onCall = onCall)
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
         }
     }
@@ -143,6 +187,7 @@ fun CallLogItem(entry: CallLogEntry, onCall: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        // The onCall lambda now contains the safe, permission-checking logic.
         IconButton(onClick = { onCall(entry.number) }) {
             Icon(Icons.Default.Call, contentDescription = "Call back")
         }
