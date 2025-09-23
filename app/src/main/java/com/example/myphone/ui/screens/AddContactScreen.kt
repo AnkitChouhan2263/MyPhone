@@ -58,11 +58,12 @@ fun AddContactScreen(
         onResult = { isGranted -> hasPermission = isGranted }
     )
 
-    // A fresh ViewModel is always in "Add" mode by default.
-    // No special initialization is needed.
-
     LaunchedEffect(key1 = uiState.didSave) {
         if (uiState.didSave) {
+            // Send the signal to the previous screen to refresh.
+            navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.set("should_refresh_contacts", true)
             navController.navigateUp()
         }
     }

@@ -72,6 +72,10 @@ fun EditContactScreen(
 
     LaunchedEffect(key1 = uiState.didSave) {
         if (uiState.didSave) {
+            // Send the signal to the previous screen to refresh.
+            navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.set("should_refresh_contacts", true)
             navController.navigateUp()
         }
     }

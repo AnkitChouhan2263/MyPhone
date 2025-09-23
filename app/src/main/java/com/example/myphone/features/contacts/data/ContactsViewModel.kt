@@ -28,6 +28,9 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<ContactsUiState> = _uiState
 
     fun fetchContacts() {
+
+        if (_allContacts.value.isNotEmpty()) return
+
         viewModelScope.launch {
             _uiState.value = ContactsUiState.Loading
             try {
@@ -40,6 +43,16 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.value = ContactsUiState.Error
             }
         }
+    }
+
+    /**
+     * Forces a refresh of the contacts list from the repository.
+     * This is called after a contact has been added, edited, or deleted.
+     */
+    fun refreshContacts() {
+        // Clear the list to ensure fetchContacts runs again.
+        _allContacts.value = emptyList()
+        fetchContacts()
     }
 
     fun onSearchQueryChange(query: String) {

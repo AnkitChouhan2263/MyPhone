@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.myphone.features.contacts.data.ContactsViewModel
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
@@ -75,15 +77,39 @@ fun ContactsScreen(
         }
     )
 
-    // A LaunchedEffect that refetches contacts when the user navigates back to the screen.
-    LaunchedEffect(navController.currentBackStackEntry) {
+    // This is the initial load, which now only runs if the ViewModel's list is empty.
+    LaunchedEffect(key1 = hasPermission) {
         if (hasPermission) {
             contactsViewModel.fetchContacts()
+        } else {
+            permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    // This effect listens for a signal from other screens to force a refresh.
+    // We observe the LiveData, resulting in a nullable State object.
+    val shouldRefreshState = currentBackStackEntry
+        ?.savedStateHandle
+        ?.getLiveData<Boolean>("should_refresh_contacts")
+        ?.observeAsState()
+
+    LaunchedEffect(shouldRefreshState?.value) {
+        if (shouldRefreshState?.value == true) {
+            contactsViewModel.refreshContacts()
+            // Reset the flag
+            currentBackStackEntry?.savedStateHandle?.set("should_refresh_contacts", false)
         }
     }
 
     val uiState by contactsViewModel.uiState.collectAsState()
     val searchQuery by contactsViewModel.searchQuery.collectAsState()
+
+    // This state now holds the last successful list to prevent blinking on refresh.
+    var lastSuccessData by remember { mutableStateOf<List<ContactsViewModel.ContactSearchResult>?>(null) }
+    if (uiState is ContactsViewModel.ContactsUiState.Success) {
+        lastSuccessData = (uiState as ContactsViewModel.ContactsUiState.Success).results
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -120,44 +146,52 @@ fun ContactsScreen(
             )
 
             if (hasPermission) {
-                when (val state = uiState) {
-                    is ContactsViewModel.ContactsUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                    is ContactsViewModel.ContactsUiState.Success -> {
-                        if (state.results.isNotEmpty()) {
-                            ContactsList(
-                                results = state.results,
-                                onContactClick = { contactId ->
-                                    navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                                }
+                // The main content area now intelligently handles loading states.
+                val dataToShow = if (uiState is ContactsViewModel.ContactsUiState.Loading && lastSuccessData != null) {
+                    lastSuccessData // If loading but we have old data, use the old data.
+                } else if (uiState is ContactsViewModel.ContactsUiState.Success) {
+                    (uiState as ContactsViewModel.ContactsUiState.Success).results
+                } else {
+                    null // Represents initial load or error
+                }
+
+                if (dataToShow != null) {
+                    if (dataToShow.isNotEmpty()) {
+                        ContactsList(
+                            results = dataToShow,
+                            onContactClick = { contactId ->
+                                navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                            }
+                        )
+                    } else {
+                        // Handle empty list and no search results scenarios
+                        if (searchQuery.isNotBlank()) {
+                            EmptyState(
+                                title = "No results found",
+                                message = "Try a different name or number.",
+                                icon = Icons.Default.SearchOff
                             )
                         } else {
-                            if (searchQuery.isNotBlank()) {
-                                EmptyState(
-                                    title = "No results found",
-                                    message = "Try a different name or number.",
-                                    icon = Icons.Default.SearchOff
-                                )
-                            } else {
-                                EmptyState(
-                                    title = "No contacts",
-                                    message = "Your contact list is empty.",
-                                    icon = Icons.Default.People
-                                )
-                            }
+                            EmptyState(
+                                title = "No contacts",
+                                message = "Your contact list is empty.",
+                                icon = Icons.Default.People
+                            )
                         }
                     }
-                    is ContactsViewModel.ContactsUiState.Error -> {
-                        EmptyState(
-                            title = "Error",
-                            message = "Failed to load your contacts. Please try again later.",
-                            icon = Icons.Default.Warning
-                        )
+                } else if (uiState is ContactsViewModel.ContactsUiState.Loading) {
+                    // Only show a full-screen spinner on the very first load.
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
+                } else if (uiState is ContactsViewModel.ContactsUiState.Error) {
+                    EmptyState(
+                        title = "Error",
+                        message = "Failed to load your contacts. Please try again later.",
+                        icon = Icons.Default.Warning
+                    )
                 }
+
             } else {
                 EmptyState(
                     title = "Permission needed",

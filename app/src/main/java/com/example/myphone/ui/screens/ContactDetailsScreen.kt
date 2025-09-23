@@ -5,8 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +52,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.myphone.features.contacts.data.ContactDetails
 import com.example.myphone.features.contacts.ui.ContactDetailsViewModel
 import com.example.myphone.features.contacts.ui.DetailsAction
 import com.example.myphone.navigation.Screen
@@ -77,8 +78,18 @@ fun ContactDetailsScreen(
     // Effect to navigate back after successful deletion
     LaunchedEffect(key1 = uiState.contactDeleted) {
         if (uiState.contactDeleted) {
+            // Send the signal to the previous screen to refresh.
+            navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.set("should_refresh_contacts", true)
             navController.navigateUp()
         }
+    }
+
+    // This state now holds the last successful data to prevent blinking.
+    var lastSuccessDetails by remember { mutableStateOf<ContactDetails?>(null) }
+    if (uiState.contactDetails != null) {
+        lastSuccessDetails = uiState.contactDetails
     }
 
     // --- Start of Call Permission Logic ---
@@ -135,51 +146,49 @@ fun ContactDetailsScreen(
             )
         }
 
+        // Use the cached data if available, otherwise check the current state.
+        val detailsToShow = lastSuccessDetails
+
         Box(modifier = Modifier.padding(padding)) {
 
-            if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            else if (uiState.contactDetails != null) {
-                val details = uiState.contactDetails!!
+
+
+            if (detailsToShow != null) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    contentPadding = PaddingValues(16.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Contact Photo and Name
                     item {
                         Spacer(modifier = Modifier.height(32.dp))
-                        // UPDATED: Replaced AsyncImage with our new smart ContactAvatar component.
                         ContactAvatar(
-                            name = details.name,
-                            photoUri = details.photoUri,
+                            name = detailsToShow.name,
+                            photoUri = detailsToShow.photoUri,
                             modifier = Modifier.size(120.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(text = details.name, style = MaterialTheme.typography.headlineMedium)
+                        Text(text = detailsToShow.name, style = MaterialTheme.typography.headlineMedium)
                         Spacer(modifier = Modifier.height(32.dp))
-
                     }
-
-                    // Phone Numbers
-                    items(details.phoneNumbers) { number ->
-                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    items(detailsToShow.phoneNumbers) { number ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = number,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Text(number, style = MaterialTheme.typography.bodyLarge)
                                 IconButton(onClick = {
                                     if (hasCallPermission) {
-                                        val intent =
-                                            Intent(Intent.ACTION_CALL, "tel:$number".toUri())
+                                        val intent = Intent(Intent.ACTION_CALL,
+                                            "tel:$number".toUri())
                                         context.startActivity(intent)
                                     } else {
                                         callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
@@ -191,8 +200,12 @@ fun ContactDetailsScreen(
                         }
                     }
                 }
-            }
-            else if (uiState.error != null) {
+            } else if (uiState.isLoading) {
+                // Only show full-screen spinner on initial load.
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (uiState.error != null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(uiState.error!!)
                 }
