@@ -4,8 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -207,20 +208,58 @@ fun ContactsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContactsList(
     results: List<ContactsViewModel.ContactSearchResult>,
     onContactClick: (String) -> Unit
 ) {
+    // UPDATED: Get a list of favorites, but don't remove them from the main list.
+    val favoriteResults = results.filter { it.contact.isFavorite }
+
     LazyColumn {
-        // UPDATED: The key is now a combination of contact ID and the matched number,
-        // ensuring it's unique even when the same contact appears multiple times.
-        items(results, key = { "${it.contact.id}-${it.matchedNumber}" }) { result ->
-            ContactListItem(
-                result = result,
-                onClick = { onContactClick(result.contact.id) }
-            )
+        // --- Favorites Section ---
+        if (favoriteResults.isNotEmpty()) {
+            stickyHeader {
+                SectionHeader(title = "Favorites")
+            }
+            items(favoriteResults, key = { "${it.contact.id}-fav-${it.matchedNumber}" }) { result ->
+                ContactListItem(
+                    result = result,
+                    onClick = { onContactClick(result.contact.id) }
+                )
+            }
         }
+
+        // --- All Contacts Section ---
+        // UPDATED: No more re-sorting needed! 'results' is already sorted alphabetically.
+        if (results.isNotEmpty()) {
+            stickyHeader {
+                SectionHeader(title = "Contacts")
+            }
+            items(results, key = { "${it.contact.id}-reg-${it.matchedNumber}" }) { result ->
+                ContactListItem(
+                    result = result,
+                    onClick = { onContactClick(result.contact.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

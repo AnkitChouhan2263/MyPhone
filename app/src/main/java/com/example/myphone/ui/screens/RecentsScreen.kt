@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,31 +173,35 @@ fun RecentsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CallLogList(
     navController: NavController,
     callLog: List<CallLogEntry>,
-    onCall: (String, Boolean) -> Unit,
+    onCall: (String, Boolean) -> Unit
 ) {
     var expandedItemId by remember { mutableStateOf<String?>(null) }
 
-    LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(callLog, key = { it.id }) { entry ->
-            CallLogItem(
-                entry = entry,
-                isExpanded = expandedItemId == entry.id,
-                onToggleExpand = {
-                    expandedItemId = if (expandedItemId == entry.id) null else entry.id
-                },
-                onCall = onCall,
-                onNavigateToDetails = { contactId ->
-                    navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                },
-                onNavigateToHistory = { number ->
-                    navController.navigate(Screen.CallHistory.createRoute(number))
-                }
-            )
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+            // The modifier is now on a simple Box, which is more stable for the animation system.
+            Box(modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300))) {
+                // All content, including padding and the divider, is inside.
+                CallLogItem(
+                    entry = entry,
+                    isExpanded = expandedItemId == entry.id,
+                    onToggleExpand = {
+                        expandedItemId = if (expandedItemId == entry.id) null else entry.id
+                    },
+                    onCall = onCall,
+                    onNavigateToDetails = { contactId ->
+                        navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                    },
+                    onNavigateToHistory = { number ->
+                        navController.navigate(Screen.CallHistory.createRoute(number))
+                    }
+                )
+            }
         }
     }
 }
@@ -208,9 +213,13 @@ fun CallLogItem(
     onToggleExpand: () -> Unit,
     onCall: (String, Boolean) -> Unit,
     onNavigateToDetails: (String) -> Unit,
-    onNavigateToHistory: (String) -> Unit,
+    onNavigateToHistory: (String) -> Unit
 ) {
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -284,6 +293,7 @@ fun CallLogItem(
                 }
             }
         }
+        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
     }
 }
 

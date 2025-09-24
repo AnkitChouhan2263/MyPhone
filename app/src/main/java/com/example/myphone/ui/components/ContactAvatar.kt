@@ -1,12 +1,13 @@
 package com.example.myphone.ui.components
 
-import androidx.compose.foundation.layout.Box
+import android.annotation.SuppressLint
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.min
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
@@ -50,28 +53,37 @@ fun ContactAvatar(
  * A composable that displays a contact's initials on a deterministically generated colored background.
  * If the name is blank, it shows a generic person icon instead.
  */
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun InitialsAvatar(
     name: String,
     modifier: Modifier = Modifier
 ) {
-    val colorPair = remember(name) { generateAvatarColors(name) }
+    // Check if the system is currently in dark theme.
+    val isDarkTheme = isSystemInDarkTheme()
+    // The color pair is now remembered based on both the name and the current theme.
+    val colorPair = remember(name, isDarkTheme) { generateAvatarColors(name, isDarkTheme) }
     val initials = remember(name) { getInitials(name) }
 
     Surface(
         color = colorPair.background,
         modifier = modifier.clip(CircleShape)
     ) {
-        Box(
+        // Use BoxWithConstraints to measure the available space for the avatar.
+        BoxWithConstraints(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            // Calculate a font size that's proportional to the avatar size.
+            // A factor of 2.5 provides a good visual balance.
+            val fontSize = LocalDensity.current.run { (min(maxWidth, maxHeight).toPx() / 2.5f).toSp() }
+
             if (initials.isNotBlank()) {
                 Text(
                     text = initials,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = fontSize, // Apply the dynamic font size.
                     color = colorPair.foreground,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.ExtraBold
                 )
             } else {
                 // If there are no initials, show a generic person icon.
@@ -103,17 +115,26 @@ private fun getInitials(name: String): String {
 }
 
 /**
- * Generates a stable, unique pair of background and foreground colors based on the contact's name.
- * The same name will always produce the same color pair.
+ * Generates a stable, unique pair of background and foreground colors based on the contact's name
+ * and the current system theme (light/dark).
  */
-private fun generateAvatarColors(name: String): AvatarColor {
+private fun generateAvatarColors(name: String, isDarkTheme: Boolean): AvatarColor {
     val hash = name.hashCode()
     // Use HSL (Hue, Saturation, Lightness) color space for more pleasing, vibrant colors.
     val hue = (hash and 0xFFFFFF) % 360f
-    // Generate a darker color for the background
-    val background = Color.hsl(hue, 0.5f, 0.15f) // Lowered lightness for an even darker background
-    // Generate a lighter color for the foreground text
-    val foreground = Color.hsl(hue, 0.45f, 0.75f) // Higher lightness for a lighter text
+
+    val background: Color
+    val foreground: Color
+
+    if (isDarkTheme) {
+        // Dark theme: Dark, muted background with a light, vibrant foreground.
+        background = Color.hsl(hue, 0.5f, 0.12f)
+        foreground = Color.hsl(hue, 0.45f, 0.85f)
+    } else {
+        // Light theme: Light, vibrant background with a dark, muted foreground.
+        background = Color.hsl(hue, 0.5f, 0.90f)
+        foreground = Color.hsl(hue, 0.55f, 0.30f)
+    }
 
     return AvatarColor(background, foreground)
 }

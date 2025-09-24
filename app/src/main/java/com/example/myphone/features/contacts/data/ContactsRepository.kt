@@ -36,7 +36,7 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
             contactProjection,
             null,
             null,
-            null
+            "${ContactsContract.Contacts.DISPLAY_NAME} ASC"
         )
 
         contactCursor?.use {
@@ -86,12 +86,8 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
                 }
             }
         }
+        return@withContext contactsMap.values.toList()
 
-        // Convert the map's values to a list and sort it alphabetically by name.
-        // UPDATED: Sort by favorite status first, then by name.
-        return@withContext contactsMap.values.sortedWith(
-            compareByDescending<Contact> { it.isFavorite }.thenBy { it.name }
-        )
     }
 
     suspend fun getContactDetails(contactId: String): ContactDetails = withContext(Dispatchers.IO) {
