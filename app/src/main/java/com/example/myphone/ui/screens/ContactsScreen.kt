@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -232,6 +234,7 @@ fun ContactListItem(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),
+        // This alignment now correctly centers the avatar, the text column, AND the star icon.
         verticalAlignment = Alignment.CenterVertically
     ) {
         // UPDATED: Replaced AsyncImage with our new smart ContactAvatar component.
@@ -242,11 +245,13 @@ fun ContactListItem(
         )
         Spacer(modifier = Modifier.width(16.dp))
 
-        Column {
+        // The Column of text is now weighted, so it will take up all available
+        // space, ensuring the star icon is never pushed off-screen.
+        Column(modifier = Modifier.weight(1f)) {
             val nameHighlightQuery = if (result.matchedNumber == null) result.matchedQuery else ""
             Text(text = buildHighlightedText(result.contact.name, nameHighlightQuery))
-            val numberToShow = result.matchedNumber ?: result.contact.numbers.firstOrNull()
 
+            val numberToShow = result.matchedNumber ?: result.contact.numbers.firstOrNull()
             numberToShow?.let { number ->
                 val numberHighlightQuery = if (result.matchedNumber != null) result.matchedQuery else ""
                 Text(
@@ -255,6 +260,18 @@ fun ContactListItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        // The star icon is now a direct child of the main Row,
+        // allowing it to be vertically centered relative to the whole item.
+        if (result.contact.isFavorite) {
+            Spacer(modifier = Modifier.width(16.dp)) // Add padding between text and star
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Favorite",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }

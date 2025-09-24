@@ -27,7 +27,9 @@ class ContactDetailsViewModel(
         val contactDetails: ContactDetails? = null,
         val error: String? = null,
         val showDeleteConfirmDialog: Boolean = false,
-        val contactDeleted: Boolean = false
+        val contactDeleted: Boolean = false,
+        // New state to signal a refresh is needed.
+        val needsRefresh: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(ContactDetailsState())
@@ -62,6 +64,25 @@ class ContactDetailsViewModel(
             DetailsAction.ShowDeleteDialog -> _uiState.update { it.copy(showDeleteConfirmDialog = true) }
             DetailsAction.HideDeleteDialog -> _uiState.update { it.copy(showDeleteConfirmDialog = false) }
             DetailsAction.ConfirmDelete -> deleteContact()
+            DetailsAction.ToggleFavorite -> toggleFavorite()
+        }
+    }
+
+    private fun toggleFavorite() {
+        val currentContact = _uiState.value.contactDetails ?: return
+        val newFavoriteState = !currentContact.isFavorite
+
+        viewModelScope.launch {
+            val success = repository.setFavoriteStatus(currentContact.id, newFavoriteState)
+            if (success) {
+                // Update the local UI state immediately for a responsive feel.
+                _uiState.update {
+                    it.copy(
+                        contactDetails = currentContact.copy(isFavorite = newFavoriteState),
+                        needsRefresh = true // Signal that the main list needs to refresh.
+                    )
+                }
+            }
         }
     }
 
@@ -89,5 +110,6 @@ sealed interface DetailsAction {
     object ShowDeleteDialog : DetailsAction
     object HideDeleteDialog : DetailsAction
     object ConfirmDelete : DetailsAction
+    object ToggleFavorite : DetailsAction // New action
 }
 

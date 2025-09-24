@@ -3,6 +3,9 @@ package com.example.myphone.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,34 +48,49 @@ fun ContactAvatar(
 
 /**
  * A composable that displays a contact's initials on a deterministically generated colored background.
+ * If the name is blank, it shows a generic person icon instead.
  */
 @Composable
 fun InitialsAvatar(
     name: String,
     modifier: Modifier = Modifier
 ) {
-    // `remember` ensures the color and initials are calculated only once for each contact
-    // and preserved across recompositions.
-    val backgroundColor = remember(name) { generateAvatarColor(name) }
+    val colorPair = remember(name) { generateAvatarColors(name) }
     val initials = remember(name) { getInitials(name) }
 
     Surface(
-        color = backgroundColor,
+        color = colorPair.background,
         modifier = modifier.clip(CircleShape)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = initials,
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
+            if (initials.isNotBlank()) {
+                Text(
+                    text = initials,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colorPair.foreground,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                // If there are no initials, show a generic person icon.
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Unknown Contact",
+                    tint = colorPair.foreground,
+                    modifier = Modifier.fillMaxSize(0.6f) // Make icon slightly smaller than circle
+                )
+            }
         }
     }
 }
+
+/**
+ * A data class to hold the generated color pair.
+ */
+data class AvatarColor(val background: Color, val foreground: Color)
+
 
 /**
  * Generates the initials from a full name.
@@ -85,12 +103,17 @@ private fun getInitials(name: String): String {
 }
 
 /**
- * Generates a stable, unique background color based on the contact's name.
- * The same name will always produce the same color.
+ * Generates a stable, unique pair of background and foreground colors based on the contact's name.
+ * The same name will always produce the same color pair.
  */
-private fun generateAvatarColor(name: String): Color {
+private fun generateAvatarColors(name: String): AvatarColor {
     val hash = name.hashCode()
     // Use HSL (Hue, Saturation, Lightness) color space for more pleasing, vibrant colors.
     val hue = (hash and 0xFFFFFF) % 360f
-    return Color.hsl(hue, 0.5f, 0.4f)
+    // Generate a darker color for the background
+    val background = Color.hsl(hue, 0.5f, 0.15f) // Lowered lightness for an even darker background
+    // Generate a lighter color for the foreground text
+    val foreground = Color.hsl(hue, 0.45f, 0.75f) // Higher lightness for a lighter text
+
+    return AvatarColor(background, foreground)
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,8 +21,12 @@ import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PhoneInTalk
+import androidx.compose.material.icons.filled.Voicemail
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -50,6 +55,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.features.recents.ui.RecentsViewModel
+import com.example.myphone.ui.components.ContactAvatar
 import com.example.myphone.ui.components.EmptyState
 
 @Composable
@@ -167,27 +173,37 @@ fun CallLogItem(entry: CallLogEntry, onCall: (String) -> Unit) {
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CallTypeIcon(type = entry.type)
+        // THE FIX: If the name is "Unknown", pass an empty string to the avatar
+        // so it knows to display the generic icon instead of initials.
+        val avatarName = if (entry.name != "Unknown") entry.name else ""
+        ContactAvatar(
+            name = avatarName,
+            photoUri = entry.photoUri,
+            modifier = Modifier.size(48.dp)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
+            val primaryText = when {
+                entry.name != "Unknown" -> entry.name
+                entry.number.isNotBlank() -> entry.number
+                else -> "Unknown Number"
+            }
             Text(
-                text = entry.name,
+                text = primaryText,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (entry.type == CallType.MISSED) FontWeight.Bold else FontWeight.Normal,
-                color = if (entry.type == CallType.MISSED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                color = if (entry.type == CallType.MISSED || entry.type == CallType.REJECTED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = entry.number,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = entry.date,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CallTypeIcon(type = entry.type)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = entry.date,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        // The onCall lambda now contains the safe, permission-checking logic.
         IconButton(onClick = { onCall(entry.number) }) {
             Icon(Icons.Default.Call, contentDescription = "Call back")
         }
@@ -203,21 +219,35 @@ fun CallTypeIcon(type: CallType) {
             icon = Icons.AutoMirrored.Filled.CallReceived
             color = Color(0xFF388E3C) // Green
         }
-
         CallType.OUTGOING -> {
             icon = Icons.AutoMirrored.Filled.CallMade
             color = Color(0xFF1976D2) // Blue
         }
-
         CallType.MISSED -> {
             icon = Icons.AutoMirrored.Filled.CallMissed
             color = MaterialTheme.colorScheme.error
         }
-
+        CallType.REJECTED -> {
+            icon = Icons.Default.CallEnd
+            color = MaterialTheme.colorScheme.error
+        }
+        CallType.BLOCKED -> {
+            icon = Icons.Default.Block
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        // Add cases for the new types
+        CallType.VOICEMAIL -> {
+            icon = Icons.Default.Voicemail
+            color = Color(0xFF8E44AD) // Purple
+        }
+        CallType.ANSWERED_EXTERNALLY -> {
+            icon = Icons.Default.PhoneInTalk
+            color = Color(0xFF00838F) // Teal
+        }
         CallType.UNKNOWN -> {
             icon = Icons.AutoMirrored.Filled.HelpOutline
             color = MaterialTheme.colorScheme.onSurfaceVariant
         }
     }
-    Icon(imageVector = icon, contentDescription = type.name, tint = color)
+    Icon(imageVector = icon, contentDescription = type.name, tint = color, modifier = Modifier.size(14.dp))
 }

@@ -7,11 +7,12 @@ package com.example.myphone.features.contacts.data
  * @param name The contact's display name.
  * @param photoUri A string URI for the contact's photo, if available.
  * @param numbers A list of all phone numbers associated with the contact.
+ * @param isFavorite True if the contact is starred/favorite, false otherwise.
  */
 data class Contact(
     val id: String,
     val name: String,
     val photoUri: String? = null,
-    val numbers: List<String> = emptyList()
+    val numbers: List<String> = emptyList(),
+    val isFavorite: Boolean = false
 )
-

@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -75,14 +77,15 @@ fun ContactDetailsScreen(
         contactDetailsViewModel.loadContactDetails()
     }
 
-    // Effect to navigate back after successful deletion
-    LaunchedEffect(key1 = uiState.contactDeleted) {
-        if (uiState.contactDeleted) {
-            // Send the signal to the previous screen to refresh.
+    // UPDATED: This effect now also listens for the needsRefresh signal.
+    LaunchedEffect(key1 = uiState.contactDeleted, key2 = uiState.needsRefresh) {
+        if (uiState.contactDeleted || uiState.needsRefresh) {
             navController.previousBackStackEntry
                 ?.savedStateHandle
                 ?.set("should_refresh_contacts", true)
-            navController.navigateUp()
+            if (uiState.contactDeleted) {
+                navController.navigateUp()
+            }
         }
     }
 
@@ -122,6 +125,14 @@ fun ContactDetailsScreen(
                 // UPDATED: Added an Edit button to the actions.
                 actions = {
                     if (uiState.contactDetails != null) {
+                        // Star (Favorite) Button
+                        IconButton(onClick = { contactDetailsViewModel.onAction(DetailsAction.ToggleFavorite) }) {
+                            Icon(
+                                imageVector = if (uiState.contactDetails!!.isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                contentDescription = "Toggle Favorite",
+                                tint = if (uiState.contactDetails!!.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         // Edit button
                         IconButton(onClick = {
                             navController.navigate(Screen.EditContact.createRoute(uiState.contactDetails!!.id))

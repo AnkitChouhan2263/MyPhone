@@ -2,6 +2,7 @@ package com.example.myphone.features.contacts.data
 
 import android.content.ContentProviderOperation
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.provider.ContactsContract
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,10 +24,12 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
         val contactsMap = mutableMapOf<String, Contact>()
 
         // --- Query 1: Fetch ALL contacts ---
+        // Add STARRED to the projection to get favorite status.
         val contactProjection = arrayOf(
             ContactsContract.Contacts._ID,
             ContactsContract.Contacts.DISPLAY_NAME,
-            ContactsContract.Contacts.PHOTO_URI
+            ContactsContract.Contacts.PHOTO_URI,
+            ContactsContract.Contacts.STARRED
         )
         val contactCursor = contentResolver.query(
             ContactsContract.Contacts.CONTENT_URI,
@@ -40,13 +43,17 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
             val idColumn = it.getColumnIndex(ContactsContract.Contacts._ID)
             val nameColumn = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
             val photoUriColumn = it.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
+            val starredColumn = it.getColumnIndex(ContactsContract.Contacts.STARRED)
+
 
             while (it.moveToNext()) {
                 val id = it.getString(idColumn)
                 val name = it.getString(nameColumn) ?: "No Name"
                 val photoUri = it.getString(photoUriColumn)
+                val isFavorite = it.getInt(starredColumn) == 1
+
                 // Initially, create the contact with an empty list of numbers.
-                contactsMap[id] = Contact(id, name, photoUri, emptyList())
+                contactsMap[id] = Contact(id, name, photoUri, emptyList(), isFavorite)
             }
         }
 
@@ -81,19 +88,24 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
         }
 
         // Convert the map's values to a list and sort it alphabetically by name.
-        return@withContext contactsMap.values.sortedBy { it.name }
+        // UPDATED: Sort by favorite status first, then by name.
+        return@withContext contactsMap.values.sortedWith(
+            compareByDescending<Contact> { it.isFavorite }.thenBy { it.name }
+        )
     }
 
     suspend fun getContactDetails(contactId: String): ContactDetails = withContext(Dispatchers.IO) {
         var name = ""
         var photoUri: String? = null
+        var isFavorite = false
         val phoneNumbers = mutableListOf<String>()
 
         val contactCursor = contentResolver.query(
             ContactsContract.Contacts.CONTENT_URI,
             arrayOf(
                 ContactsContract.Contacts.DISPLAY_NAME,
-                ContactsContract.Contacts.PHOTO_URI
+                ContactsContract.Contacts.PHOTO_URI,
+                ContactsContract.Contacts.STARRED
             ),
             "${ContactsContract.Contacts._ID} = ?",
             arrayOf(contactId),
@@ -104,6 +116,7 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
             if (it.moveToFirst()) {
                 name = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME))
                 photoUri = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts.PHOTO_URI))
+                isFavorite = it.getInt(it.getColumnIndexOrThrow(ContactsContract.Contacts.STARRED)) == 1
             }
         }
 
@@ -122,7 +135,31 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
                 phoneNumbers.add(normalizePhoneNumber(rawNumber))
             }
         }
-        return@withContext ContactDetails(contactId, name, photoUri, phoneNumbers.distinct())
+        return@withContext ContactDetails(contactId, name, photoUri, phoneNumbers.distinct(), isFavorite)
+    }
+
+    /**
+     * Sets the favorite (starred) status for a given contact.
+     */
+    suspend fun setFavoriteStatus(contactId: String, isFavorite: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put(ContactsContract.Contacts.STARRED, if (isFavorite) 1 else 0)
+        }
+        val selection = "${ContactsContract.Contacts._ID} = ?"
+        val selectionArgs = arrayOf(contactId)
+
+        return@withContext try {
+            val rowsUpdated = contentResolver.update(
+                ContactsContract.Contacts.CONTENT_URI,
+                values,
+                selection,
+                selectionArgs
+            )
+            rowsUpdated > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     suspend fun addContact(
