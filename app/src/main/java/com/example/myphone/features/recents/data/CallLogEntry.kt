@@ -13,6 +13,7 @@ package com.example.myphone.features.recents.data
  */
 data class CallLogEntry(
     val id: String,
+    val contactId: String?, // The ID of the contact in the address book.
     val name: String,
     val number: String,
     val type: CallType,

@@ -1,13 +1,13 @@
 package com.example.myphone.features.recents.data
 
 import android.content.ContentResolver
-import android.net.Uri
 import android.provider.CallLog
 import android.provider.ContactsContract
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class RecentsRepository(private val contentResolver: ContentResolver) {
 
@@ -18,8 +18,7 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
      */
     suspend fun getCallLog(): List<CallLogEntry> = withContext(Dispatchers.IO) {
         // Step 1: Create a map of all phone numbers to their photo URIs in a single query.
-        val phonePhotoMap = getPhoneToPhotoUriMap()
-
+        val phoneInfoMap = getPhoneInfoMap()
         val callLog = mutableListOf<CallLogEntry>()
 
         val projection = arrayOf(
@@ -57,7 +56,9 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
                 val duration = it.getLong(durationColumn)
 
                 // Step 3: Use the pre-fetched map for a fast, in-memory lookup.
-                val photoUri = phonePhotoMap[number]
+                val contactInfo = phoneInfoMap[number]
+                val contactId = contactInfo?.contactId
+                val photoUri = contactInfo?.photoUri
 
                 val type = when (it.getInt(typeColumn)) {
                     CallLog.Calls.INCOMING_TYPE -> CallType.INCOMING
@@ -73,6 +74,7 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
                 callLog.add(
                     CallLogEntry(
                         id = id,
+                        contactId = contactId, // Add the contactId
                         name = name,
                         number = number,
                         type = type,
@@ -87,12 +89,18 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
     }
 
     /**
-     * A new helper function that efficiently fetches all phone numbers and their
-     * corresponding photo URIs, returning them as a map for quick lookups.
+     * A data class to hold info retrieved from the contacts provider.
      */
-    private fun getPhoneToPhotoUriMap(): Map<String, String?> {
-        val map = mutableMapOf<String, String?>()
+    private data class PhoneContactInfo(val contactId: String?, val photoUri: String?)
+
+    /**
+     * A helper function that fetches all phone numbers and maps them to their
+     * corresponding contact ID and photo URI for quick lookups.
+     */
+    private fun getPhoneInfoMap(): Map<String, PhoneContactInfo> {
+        val map = mutableMapOf<String, PhoneContactInfo>()
         val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.NUMBER,
             ContactsContract.CommonDataKinds.Phone.PHOTO_URI
         )
@@ -104,14 +112,16 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
             null
         )
         cursor?.use {
+            val contactIdColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
             val numberColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
             val photoUriColumn = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-            if (numberColumn != -1 && photoUriColumn != -1) {
+            if (contactIdColumn != -1 && numberColumn != -1 && photoUriColumn != -1) {
                 while (it.moveToNext()) {
+                    val contactId = it.getString(contactIdColumn)
                     val number = it.getString(numberColumn)
                     val photoUri = it.getString(photoUriColumn)
                     if (number != null) {
-                        map[number] = photoUri
+                        map[number] = PhoneContactInfo(contactId, photoUri)
                     }
                 }
             }

@@ -1,5 +1,7 @@
 package com.example.myphone.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dialpad
@@ -13,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
@@ -40,6 +43,10 @@ sealed class Screen(val route: String) {
     object EditContact : Screen("edit_contact/{contactId}") {
         fun createRoute(contactId: String) = "edit_contact/$contactId"
     }
+    // NEW: A route for the call history screen for a specific number.
+    object CallHistory : Screen("call_history/{phoneNumber}") {
+        fun createRoute(phoneNumber: String) = "call_history/$phoneNumber"
+    }
     object ContactDetails : Screen("contacts/{contactId}") {
         fun createRoute(contactId: String) = "contacts/$contactId"
     }
@@ -65,7 +72,9 @@ fun AppNavigation() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) { HomeScreen() }
-            composable(Screen.Recents.route) { RecentsScreen() }
+            composable(Screen.Recents.route) { RecentsScreen(
+                navController = navController
+            ) }
             composable(Screen.Dialer.route) { DialerScreen() }
             composable(Screen.Contacts.route) {
                 ContactsScreen(navController = navController)
@@ -82,6 +91,17 @@ fun AppNavigation() {
                     navController = navController,
                     backStackEntry = backStackEntry
                 )
+            }
+            // NEW: Add the call history screen to the navigation graph.
+            // For now, it will show a placeholder.
+            composable(
+                route = Screen.CallHistory.route,
+                arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType })
+            ) {
+                // In a future step, we would build a full CallHistoryScreen here.
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("History Screen Placeholder")
+                }
             }
             composable(
                 route = Screen.ContactDetails.route,

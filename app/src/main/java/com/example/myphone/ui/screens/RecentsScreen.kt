@@ -5,6 +5,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +32,11 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhoneInTalk
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Voicemail
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -52,16 +61,21 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.features.recents.ui.RecentsViewModel
+import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 import com.example.myphone.ui.components.EmptyState
 
 @Composable
-fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
+fun RecentsScreen(
+    navController: NavController,
+    recentsViewModel: RecentsViewModel = viewModel(),
+) {
     val context = LocalContext.current
-    // --- Permission for READING the call log ---
+
     var hasReadPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -116,11 +130,15 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
             is RecentsViewModel.RecentsUiState.Success -> {
                 if (state.callLog.isNotEmpty()) {
                     CallLogList(
+                        navController = navController,
                         callLog = state.callLog,
-                        onCall = { number ->
-                            // THE FIX: Check for call permission before making the call.
+                        onCall = { number, isVideo ->
                             if (hasCallPermission) {
-                                val intent = Intent(Intent.ACTION_CALL, "tel:$number".toUri())
+                                val intentAction = if (isVideo) Intent.ACTION_VIEW else Intent.ACTION_CALL
+                                val intent = Intent(intentAction, "tel:$number".toUri())
+                                if (isVideo) {
+                                    intent.putExtra("videocall", true)
+                                }
                                 context.startActivity(intent)
                             } else {
                                 callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
@@ -155,57 +173,116 @@ fun RecentsScreen(recentsViewModel: RecentsViewModel = viewModel()) {
 }
 
 @Composable
-fun CallLogList(callLog: List<CallLogEntry>, onCall: (String) -> Unit) {
-    LazyColumn(modifier = Modifier.padding(16.dp)) {
-        items(callLog) { entry ->
-            // Pass the onCall lambda down to the item.
-            CallLogItem(entry = entry, onCall = onCall)
+fun CallLogList(
+    navController: NavController,
+    callLog: List<CallLogEntry>,
+    onCall: (String, Boolean) -> Unit,
+) {
+    var expandedItemId by remember { mutableStateOf<String?>(null) }
+
+    LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+        items(callLog, key = { it.id }) { entry ->
+            CallLogItem(
+                entry = entry,
+                isExpanded = expandedItemId == entry.id,
+                onToggleExpand = {
+                    expandedItemId = if (expandedItemId == entry.id) null else entry.id
+                },
+                onCall = onCall,
+                onNavigateToDetails = { contactId ->
+                    navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                },
+                onNavigateToHistory = { number ->
+                    navController.navigate(Screen.CallHistory.createRoute(number))
+                }
+            )
             HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
         }
     }
 }
 
 @Composable
-fun CallLogItem(entry: CallLogEntry, onCall: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // THE FIX: If the name is "Unknown", pass an empty string to the avatar
-        // so it knows to display the generic icon instead of initials.
-        val avatarName = if (entry.name != "Unknown") entry.name else ""
-        ContactAvatar(
-            name = avatarName,
-            photoUri = entry.photoUri,
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            val primaryText = when {
-                entry.name != "Unknown" -> entry.name
-                entry.number.isNotBlank() -> entry.number
-                else -> "Unknown Number"
-            }
-            Text(
-                text = primaryText,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (entry.type == CallType.MISSED) FontWeight.Bold else FontWeight.Normal,
-                color = if (entry.type == CallType.MISSED || entry.type == CallType.REJECTED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CallTypeIcon(type = entry.type)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = entry.date,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+fun CallLogItem(
+    entry: CallLogEntry,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onCall: (String, Boolean) -> Unit,
+    onNavigateToDetails: (String) -> Unit,
+    onNavigateToHistory: (String) -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpand)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.clickable(enabled = entry.contactId != null) {
+                entry.contactId?.let { onNavigateToDetails(it) }
+            }) {
+                val avatarName = if (entry.name != "Unknown") entry.name else ""
+                ContactAvatar(
+                    name = avatarName,
+                    photoUri = entry.photoUri,
+                    modifier = Modifier.size(48.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val primaryText = when {
+                    entry.name != "Unknown" -> entry.name
+                    entry.number.isNotBlank() -> entry.number
+                    else -> "Unknown Number"
+                }
+                Text(
+                    text = primaryText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (entry.type == CallType.MISSED || entry.type == CallType.REJECTED) FontWeight.Bold else FontWeight.Normal,
+                    color = if (entry.type == CallType.MISSED || entry.type == CallType.REJECTED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CallTypeIcon(type = entry.type)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = entry.date,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            IconButton(onClick = { onCall(entry.number, false) }) {
+                Icon(Icons.Default.Call, contentDescription = "Call back")
+            }
         }
-        IconButton(onClick = { onCall(entry.number) }) {
-            Icon(Icons.Default.Call, contentDescription = "Call back")
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp, start = 64.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Button(onClick = { onNavigateToHistory(entry.number) }) {
+                    Icon(
+                        Icons.Default.History, modifier = Modifier.size(ButtonDefaults.IconSize),
+                        contentDescription = "Call History"
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("History")
+                }
+                Button(onClick = { onCall(entry.number, true) }) {
+                    Icon(
+                        Icons.Default.Videocam, modifier = Modifier.size(ButtonDefaults.IconSize),
+                        contentDescription = "Video Call"
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Video Call")
+                }
+            }
         }
     }
 }
@@ -217,11 +294,11 @@ fun CallTypeIcon(type: CallType) {
     when (type) {
         CallType.INCOMING -> {
             icon = Icons.AutoMirrored.Filled.CallReceived
-            color = Color(0xFF388E3C) // Green
+            color = Color(0xFF388E3C)
         }
         CallType.OUTGOING -> {
             icon = Icons.AutoMirrored.Filled.CallMade
-            color = Color(0xFF1976D2) // Blue
+            color = Color(0xFF1976D2)
         }
         CallType.MISSED -> {
             icon = Icons.AutoMirrored.Filled.CallMissed
@@ -235,14 +312,13 @@ fun CallTypeIcon(type: CallType) {
             icon = Icons.Default.Block
             color = MaterialTheme.colorScheme.onSurfaceVariant
         }
-        // Add cases for the new types
         CallType.VOICEMAIL -> {
             icon = Icons.Default.Voicemail
-            color = Color(0xFF8E44AD) // Purple
+            color = Color(0xFF8E44AD)
         }
         CallType.ANSWERED_EXTERNALLY -> {
             icon = Icons.Default.PhoneInTalk
-            color = Color(0xFF00838F) // Teal
+            color = Color(0xFF00838F)
         }
         CallType.UNKNOWN -> {
             icon = Icons.AutoMirrored.Filled.HelpOutline
@@ -251,3 +327,4 @@ fun CallTypeIcon(type: CallType) {
     }
     Icon(imageVector = icon, contentDescription = type.name, tint = color, modifier = Modifier.size(14.dp))
 }
+
