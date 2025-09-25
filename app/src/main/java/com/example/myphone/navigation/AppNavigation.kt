@@ -1,7 +1,5 @@
 package com.example.myphone.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dialpad
@@ -15,7 +13,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavHostController
@@ -26,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myphone.ui.screens.AddContactScreen
+import com.example.myphone.ui.screens.CallHistoryScreen
 import com.example.myphone.ui.screens.ContactDetailsScreen
 import com.example.myphone.ui.screens.ContactsScreen
 import com.example.myphone.ui.screens.DialerScreen
@@ -98,10 +96,8 @@ fun AppNavigation() {
                 route = Screen.CallHistory.route,
                 arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType })
             ) {
-                // In a future step, we would build a full CallHistoryScreen here.
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("History Screen Placeholder")
-                }
+                // Replace the placeholder with the real screen.
+                CallHistoryScreen(navController = navController)
             }
             composable(
                 route = Screen.ContactDetails.route,

@@ -89,6 +89,73 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
     }
 
     /**
+     * Fetches the complete call history for a single, specific phone number.
+     */
+    suspend fun getCallHistoryForNumber(phoneNumber: String): List<CallLogEntry> = withContext(Dispatchers.IO) {
+        val phoneInfoMap = getPhoneInfoMap()
+        val callLog = mutableListOf<CallLogEntry>()
+        val projection = arrayOf(
+            CallLog.Calls._ID,
+            CallLog.Calls.CACHED_NAME,
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+            CallLog.Calls.DURATION
+        )
+        // This is the filter to get calls for only one number.
+        val selection = "${CallLog.Calls.NUMBER} = ?"
+        val selectionArgs = arrayOf(phoneNumber)
+        val sortOrder = "${CallLog.Calls.DATE} DESC"
+
+        val cursor = contentResolver.query(
+            CallLog.Calls.CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
+        )
+
+        cursor?.use {
+            // ... (cursor processing logic is identical to getCallLog)
+            while (it.moveToNext()) {
+                val id = it.getString(it.getColumnIndex(CallLog.Calls._ID))
+                val name = it.getString(it.getColumnIndex(CallLog.Calls.CACHED_NAME)).takeIf { !it.isNullOrBlank() } ?: "Unknown"
+                val number = it.getString(it.getColumnIndex(CallLog.Calls.NUMBER)) ?: ""
+                val date = it.getLong(it.getColumnIndex(CallLog.Calls.DATE))
+                val duration = it.getLong(it.getColumnIndex(CallLog.Calls.DURATION))
+                val contactInfo = phoneInfoMap[number]
+                val contactId = contactInfo?.contactId
+                val photoUri = contactInfo?.photoUri
+
+                val type = when (it.getInt(it.getColumnIndex(CallLog.Calls.TYPE))) {
+                    CallLog.Calls.INCOMING_TYPE -> CallType.INCOMING
+                    CallLog.Calls.OUTGOING_TYPE -> CallType.OUTGOING
+                    CallLog.Calls.MISSED_TYPE -> CallType.MISSED
+                    CallLog.Calls.REJECTED_TYPE -> CallType.REJECTED
+                    CallLog.Calls.BLOCKED_TYPE -> CallType.BLOCKED
+                    CallLog.Calls.VOICEMAIL_TYPE -> CallType.VOICEMAIL
+                    CallLog.Calls.ANSWERED_EXTERNALLY_TYPE -> CallType.ANSWERED_EXTERNALLY
+                    else -> CallType.UNKNOWN
+                }
+
+                callLog.add(
+                    CallLogEntry(
+                        id = id,
+                        contactId = contactId,
+                        name = name,
+                        number = number,
+                        type = type,
+                        date = formatDate(date),
+                        duration = duration,
+                        photoUri = photoUri
+                    )
+                )
+            }
+        }
+        return@withContext callLog
+    }
+
+    /**
      * A data class to hold info retrieved from the contacts provider.
      */
     private data class PhoneContactInfo(val contactId: String?, val photoUri: String?)
