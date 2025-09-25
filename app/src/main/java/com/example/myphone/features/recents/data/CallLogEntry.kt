@@ -17,7 +17,8 @@ data class CallLogEntry(
     val name: String,
     val number: String,
     val type: CallType,
-    val date: String,
+    val dateMillis: Long, // The raw timestamp for grouping logic
+    val formattedDate: String, // The display-friendly string
     val duration: Long,
     val photoUri: String? = null
 )

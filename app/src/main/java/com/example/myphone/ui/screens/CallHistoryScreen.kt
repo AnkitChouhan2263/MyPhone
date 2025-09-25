@@ -195,7 +195,7 @@ private fun CallHistoryItem(entry: CallLogEntry) {
                 CallTypeIcon(type = entry.type)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = entry.date,
+                    text = entry.formattedDate,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

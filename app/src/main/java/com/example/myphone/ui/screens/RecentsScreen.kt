@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +68,7 @@ import com.example.myphone.features.recents.ui.RecentsViewModel
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 import com.example.myphone.ui.components.EmptyState
+import java.util.Calendar
 
 @Composable
 fun RecentsScreen(
@@ -181,26 +181,32 @@ fun CallLogList(
     onCall: (String, Boolean) -> Unit
 ) {
     var expandedItemId by remember { mutableStateOf<String?>(null) }
+    val groupedByDate = callLog.groupBy { getDateSection(it.dateMillis) }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(callLog, key = { it.id }) { entry ->
-            // The modifier is now on a simple Box, which is more stable for the animation system.
-            Box(modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300))) {
-                // All content, including padding and the divider, is inside.
-                CallLogItem(
-                    entry = entry,
-                    isExpanded = expandedItemId == entry.id,
-                    onToggleExpand = {
-                        expandedItemId = if (expandedItemId == entry.id) null else entry.id
-                    },
-                    onCall = onCall,
-                    onNavigateToDetails = { contactId ->
-                        navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                    },
-                    onNavigateToHistory = { number ->
-                        navController.navigate(Screen.CallHistory.createRoute(number))
-                    }
-                )
+        groupedByDate.forEach { (section, entries) ->
+            stickyHeader {
+                SectionHeader(title = section.title)
+            }
+            // THE FIX: Iterate over the correct 'entries' for this section, not the whole 'callLog'.
+            items(entries, key = { it.id }) { entry ->
+                // The animation is now on a simple container Box, which is more stable.
+                Box(modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300))) {
+                    CallLogItem(
+                        entry = entry,
+                        isExpanded = expandedItemId == entry.id,
+                        onToggleExpand = {
+                            expandedItemId = if (expandedItemId == entry.id) null else entry.id
+                        },
+                        onCall = onCall,
+                        onNavigateToDetails = { contactId ->
+                            navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                        },
+                        onNavigateToHistory = { number ->
+                            navController.navigate(Screen.CallHistory.createRoute(number))
+                        }
+                    )
+                }
             }
         }
     }
@@ -215,6 +221,7 @@ fun CallLogItem(
     onNavigateToDetails: (String) -> Unit,
     onNavigateToHistory: (String) -> Unit
 ) {
+    // The entire item, including the divider, is now one self-contained unit.
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -254,7 +261,7 @@ fun CallLogItem(
                     CallTypeIcon(type = entry.type)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = entry.date,
+                        text = entry.formattedDate,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -293,7 +300,7 @@ fun CallLogItem(
                 }
             }
         }
-        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+        HorizontalDivider()
     }
 }
 
@@ -336,5 +343,35 @@ fun CallTypeIcon(type: CallType) {
         }
     }
     Icon(imageVector = icon, contentDescription = type.name, tint = color, modifier = Modifier.size(14.dp))
+}
+
+/**
+ * A sealed class to represent the date-based sections for the call log.
+ */
+private sealed class DateSection(val title: String) {
+    object Today : DateSection("Today")
+    object Yesterday : DateSection("Yesterday")
+    object Older : DateSection("Older")
+}
+
+/**
+ * A helper function to determine which date section a call log entry belongs to.
+ */
+private fun getDateSection(timestamp: Long): DateSection {
+    val now = Calendar.getInstance()
+    val callDate = Calendar.getInstance().apply { timeInMillis = timestamp }
+
+    if (now.get(Calendar.YEAR) == callDate.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == callDate.get(Calendar.DAY_OF_YEAR)) {
+        return DateSection.Today
+    }
+
+    now.add(Calendar.DAY_OF_YEAR, -1) // Set calendar to yesterday
+    if (now.get(Calendar.YEAR) == callDate.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == callDate.get(Calendar.DAY_OF_YEAR)) {
+        return DateSection.Yesterday
+    }
+
+    return DateSection.Older
 }
 

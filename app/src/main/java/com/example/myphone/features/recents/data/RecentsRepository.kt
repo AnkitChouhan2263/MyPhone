@@ -52,7 +52,7 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
                 val id = it.getString(idColumn)
                 val name = it.getString(nameColumn).takeIf { !it.isNullOrBlank() } ?: "Unknown"
                 val number = it.getString(numberColumn) ?: ""
-                val date = it.getLong(dateColumn)
+                val date = it.getLong(dateColumn) // Get the raw long timestamp
                 val duration = it.getLong(durationColumn)
 
                 // Step 3: Use the pre-fetched map for a fast, in-memory lookup.
@@ -74,11 +74,12 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
                 callLog.add(
                     CallLogEntry(
                         id = id,
-                        contactId = contactId, // Add the contactId
+                        contactId = contactId,
                         name = name,
                         number = number,
                         type = type,
-                        date = formatDate(date),
+                        dateMillis = date, // Store the raw timestamp
+                        formattedDate = formatDate(date), // Store the formatted string
                         duration = duration,
                         photoUri = photoUri
                     )
@@ -115,19 +116,28 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
             sortOrder
         )
 
-        cursor?.use {
-            // ... (cursor processing logic is identical to getCallLog)
-            while (it.moveToNext()) {
-                val id = it.getString(it.getColumnIndex(CallLog.Calls._ID))
-                val name = it.getString(it.getColumnIndex(CallLog.Calls.CACHED_NAME)).takeIf { !it.isNullOrBlank() } ?: "Unknown"
-                val number = it.getString(it.getColumnIndex(CallLog.Calls.NUMBER)) ?: ""
-                val date = it.getLong(it.getColumnIndex(CallLog.Calls.DATE))
-                val duration = it.getLong(it.getColumnIndex(CallLog.Calls.DURATION))
+        cursor?.use { c ->
+            val idColumn = c.getColumnIndex(CallLog.Calls._ID)
+            val nameColumn = c.getColumnIndex(CallLog.Calls.CACHED_NAME)
+            val numberColumn = c.getColumnIndex(CallLog.Calls.NUMBER)
+            val typeColumn = c.getColumnIndex(CallLog.Calls.TYPE)
+            val dateColumn = c.getColumnIndex(CallLog.Calls.DATE)
+            val durationColumn = c.getColumnIndex(CallLog.Calls.DURATION)
+
+            while (c.moveToNext()) {
+                // Safely get data by checking if the column index is valid (-1 means not found).
+                val id = if (idColumn != -1) c.getString(idColumn) else ""
+                val name = if (nameColumn != -1) c.getString(nameColumn).takeIf { !it.isNullOrBlank() } ?: "Unknown" else "Unknown"
+                val number = if (numberColumn != -1) c.getString(numberColumn) ?: "" else ""
+                val date = if (dateColumn != -1) c.getLong(dateColumn) else 0L
+                val duration = if (durationColumn != -1) c.getLong(durationColumn) else 0L
+                val typeInt = if (typeColumn != -1) c.getInt(typeColumn) else -1
+
                 val contactInfo = phoneInfoMap[number]
                 val contactId = contactInfo?.contactId
                 val photoUri = contactInfo?.photoUri
 
-                val type = when (it.getInt(it.getColumnIndex(CallLog.Calls.TYPE))) {
+                val type = when (typeInt) {
                     CallLog.Calls.INCOMING_TYPE -> CallType.INCOMING
                     CallLog.Calls.OUTGOING_TYPE -> CallType.OUTGOING
                     CallLog.Calls.MISSED_TYPE -> CallType.MISSED
@@ -145,7 +155,8 @@ class RecentsRepository(private val contentResolver: ContentResolver) {
                         name = name,
                         number = number,
                         type = type,
-                        date = formatDate(date),
+                        dateMillis = date,
+                        formattedDate = formatDate(date),
                         duration = duration,
                         photoUri = photoUri
                     )
