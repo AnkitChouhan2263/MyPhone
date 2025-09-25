@@ -3,7 +3,6 @@ package com.example.myphone.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dialpad
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -29,11 +28,12 @@ import com.example.myphone.ui.screens.ContactsScreen
 import com.example.myphone.ui.screens.DialerScreen
 import com.example.myphone.ui.screens.EditContactScreen
 import com.example.myphone.ui.screens.HomeScreen
-import com.example.myphone.ui.screens.RecentsScreen
+
+//import com.example.myphone.ui.screens.RecentsScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
-    object Recents : Screen("recents")
+//    object Recents : Screen("recents")
     object Dialer : Screen("keypad")
     object Contacts : Screen("contacts")
     // NEW: Two separate, distinct routes for Add and Edit.
@@ -52,7 +52,7 @@ sealed class Screen(val route: String) {
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home.route, "Home", Icons.Default.Home),
-    BottomNavItem(Screen.Recents.route, "Recents", Icons.Default.History),
+//    BottomNavItem(Screen.Recents.route, "Recents", Icons.Default.History),
     BottomNavItem(Screen.Dialer.route, "Keypad", Icons.Default.Dialpad),
     BottomNavItem(Screen.Contacts.route, "Contacts", Icons.Default.Person)
 )
@@ -69,10 +69,12 @@ fun AppNavigation() {
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { HomeScreen() }
-            composable(Screen.Recents.route) { RecentsScreen(
+            composable(Screen.Home.route) { HomeScreen(
                 navController = navController
             ) }
+//            composable(Screen.Recents.route) { RecentsScreen(
+//                navController = navController
+//            ) }
             composable(Screen.Dialer.route) { DialerScreen() }
             composable(Screen.Contacts.route) {
                 ContactsScreen(navController = navController)

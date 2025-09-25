@@ -3,6 +3,7 @@ package com.example.myphone.features.contacts.data
 import android.content.ContentProviderOperation
 import android.content.ContentResolver
 import android.content.ContentValues
+import android.net.Uri
 import android.provider.ContactsContract
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -350,6 +351,38 @@ class ContactsRepository(private val contentResolver: ContentResolver) {
         }
         cursor?.close()
         return rawContactId
+    }
+
+    /**
+     * THE FIX: This is the missing function.
+     * It performs an efficient lookup to find a contact's basic info by their phone number.
+     */
+    suspend fun getContactInfoForNumber(number: String): ContactInfo? = withContext(Dispatchers.IO) {
+        if (number.isBlank()) return@withContext null
+
+        val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number))
+        val projection = arrayOf(
+            ContactsContract.PhoneLookup._ID,
+            ContactsContract.PhoneLookup.DISPLAY_NAME,
+            ContactsContract.PhoneLookup.PHOTO_URI
+        )
+
+        val cursor = contentResolver.query(lookupUri, projection, null, null, null)
+        var contactInfo: ContactInfo? = null
+
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val idCol = it.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                val nameCol = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                val photoUriCol = it.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+
+                val id = if (idCol != -1) it.getString(idCol) else null
+                val name = if (nameCol != -1) it.getString(nameCol) else "Unknown"
+                val photoUri = if (photoUriCol != -1) it.getString(photoUriCol) else null
+                contactInfo = ContactInfo(id, name, photoUri)
+            }
+        }
+        return@withContext contactInfo
     }
 
     private fun normalizePhoneNumber(number: String): String {
