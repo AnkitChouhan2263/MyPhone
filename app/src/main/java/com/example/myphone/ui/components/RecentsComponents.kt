@@ -27,6 +27,7 @@ import androidx.navigation.NavController
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.navigation.Screen
+import com.example.myphone.ui.screens.SectionHeader
 import java.util.Calendar
 import java.util.Locale
 
@@ -72,22 +73,6 @@ fun CallLogList(
     }
 }
 
-// These are now private helper composables, only used within this file.
-@Composable
-private fun SectionHeader(title: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
-    ) {
-        Text(
-            text = title.uppercase(Locale.getDefault()),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 @Composable
 private fun CallLogItem(
@@ -175,7 +160,7 @@ private fun CallLogItem(
 }
 
 @Composable
-private fun CallTypeIcon(type: CallType, modifier: Modifier = Modifier) {
+fun CallTypeIcon(type: CallType, modifier: Modifier = Modifier) {
     val icon: ImageVector
     val color: Color
     when (type) {
@@ -215,13 +200,13 @@ private fun CallTypeIcon(type: CallType, modifier: Modifier = Modifier) {
     Icon(imageVector = icon, contentDescription = type.name, tint = color, modifier = modifier)
 }
 
-private sealed class DateSection(val title: String) {
+sealed class DateSection(val title: String) {
     object Today : DateSection("Today")
     object Yesterday : DateSection("Yesterday")
     object Older : DateSection("Older")
 }
 
-private fun getDateSection(timestamp: Long): DateSection {
+fun getDateSection(timestamp: Long): DateSection {
     val now = Calendar.getInstance()
     val callDate = Calendar.getInstance().apply { timeInMillis = timestamp }
 

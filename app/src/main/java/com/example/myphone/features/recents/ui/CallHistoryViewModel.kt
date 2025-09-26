@@ -32,7 +32,7 @@ class CallHistoryViewModel(
 
     private val recentsRepository = RecentsRepository(application.contentResolver)
     private val contactsRepository = ContactsRepository(application.contentResolver)
-    private val phoneNumber: String? = savedStateHandle.get("phoneNumber")
+    private val phoneNumber: String? = savedStateHandle["phoneNumber"]
 
     init {
         fetchHistory()
