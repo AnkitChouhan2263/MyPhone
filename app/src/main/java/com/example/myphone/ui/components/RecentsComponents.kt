@@ -27,13 +27,12 @@ import androidx.navigation.NavController
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
 import com.example.myphone.navigation.Screen
-import com.example.myphone.ui.screens.SectionHeader
 import java.util.Calendar
 import java.util.Locale
 
 /**
- * A reusable, self-contained composable that displays a list of call log entries.
- * It contains its own LazyColumn and handles grouping and animations internally.
+ * A reusable, self-contained composable that displays a list of call log entries
+ * with fully animated items and sticky headers.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -48,34 +47,53 @@ fun CallLogList(
 
     LazyColumn(modifier = modifier) {
         groupedByDate.forEach { (section, entries) ->
+            // THE FIX: The stickyHeader itself is now an animated item.
             stickyHeader {
-                SectionHeader(title = section.title)
+                Box(modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300))) {
+                    SectionHeader(title = section.title)
+                }
             }
             items(entries, key = { it.id }) { entry ->
-                Box(modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300))) {
-                    CallLogItem(
-                        entry = entry,
-                        isExpanded = expandedItemId == entry.id,
-                        onToggleExpand = {
-                            expandedItemId = if (expandedItemId == entry.id) null else entry.id
-                        },
-                        onCall = onCall,
-                        onNavigateToDetails = { contactId ->
-                            navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                        },
-                        onNavigateToHistory = { number ->
-                            navController.navigate(Screen.CallHistory.createRoute(number))
-                        }
-                    )
-                }
+                // The animation is applied to the self-contained CallLogItem.
+                CallLogItem(
+                    modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(300)),
+                    entry = entry,
+                    isExpanded = expandedItemId == entry.id,
+                    onToggleExpand = {
+                        expandedItemId = if (expandedItemId == entry.id) null else entry.id
+                    },
+                    onCall = onCall,
+                    onNavigateToDetails = { contactId ->
+                        navController.navigate(Screen.ContactDetails.createRoute(contactId))
+                    },
+                    onNavigateToHistory = { number ->
+                        navController.navigate(Screen.CallHistory.createRoute(number))
+                    }
+                )
             }
         }
     }
 }
 
+@Composable
+private fun SectionHeader(title: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+    ) {
+        Text(
+            text = title.uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 private fun CallLogItem(
+    modifier: Modifier = Modifier,
     entry: CallLogEntry,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
@@ -83,8 +101,9 @@ private fun CallLogItem(
     onNavigateToDetails: (String) -> Unit,
     onNavigateToHistory: (String) -> Unit
 ) {
+    // THE FIX: The item is now a self-contained unit, including its own divider.
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
@@ -155,7 +174,7 @@ private fun CallLogItem(
                 }
             }
         }
-//        HorizontalDivider()
+        HorizontalDivider()
     }
 }
 
