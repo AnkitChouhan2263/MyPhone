@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.min
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.myphone.features.settings.data.AvatarStyle
 
 /**
  * A smart avatar composable that displays the contact's photo if available,
@@ -32,6 +33,7 @@ import coil.request.ImageRequest
 fun ContactAvatar(
     name: String,
     photoUri: String?,
+    avatarStyle: AvatarStyle,
     modifier: Modifier = Modifier
 ) {
     if (!photoUri.isNullOrBlank()) {
@@ -45,7 +47,7 @@ fun ContactAvatar(
             contentScale = ContentScale.Crop
         )
     } else {
-        InitialsAvatar(name = name, modifier = modifier)
+        InitialsAvatar(name = name, avatarStyle = avatarStyle, modifier = modifier)
     }
 }
 
@@ -55,8 +57,9 @@ fun ContactAvatar(
  */
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
-fun InitialsAvatar(
+private fun InitialsAvatar(
     name: String,
+    avatarStyle: AvatarStyle,
     modifier: Modifier = Modifier
 ) {
     // Check if the system is currently in dark theme.
@@ -74,24 +77,22 @@ fun InitialsAvatar(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            // Calculate a font size that's proportional to the avatar size.
-            // A factor of 2.5 provides a good visual balance.
-            val fontSize = LocalDensity.current.run { (min(maxWidth, maxHeight).toPx() / 2.5f).toSp() }
+            val dynamicFontSize = LocalDensity.current.run { (min(maxWidth, maxHeight).toPx() / 2.5f).toSp() }
 
-            if (initials.isNotBlank()) {
+            if (avatarStyle == AvatarStyle.INITIALS && initials.isNotBlank()) {
                 Text(
                     text = initials,
-                    fontSize = fontSize, // Apply the dynamic font size.
+                    // THE FIX: Use the dynamically calculated font size.
+                    fontSize = dynamicFontSize,
                     color = colorPair.foreground,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
             } else {
-                // If there are no initials, show a generic person icon.
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "Unknown Contact",
+                    contentDescription = "Contact",
                     tint = colorPair.foreground,
-                    modifier = Modifier.fillMaxSize(0.6f) // Make icon slightly smaller than circle
+                    modifier = Modifier.fillMaxSize(0.6f)
                 )
             }
         }

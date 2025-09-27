@@ -49,6 +49,8 @@ import androidx.navigation.NavController
 import com.example.myphone.features.contacts.data.ContactInfo
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.ui.CallHistoryViewModel
+import com.example.myphone.features.settings.data.AvatarStyle
+import com.example.myphone.features.settings.ui.SettingsViewModel
 import com.example.myphone.ui.components.CallTypeIcon
 import com.example.myphone.ui.components.ContactAvatar
 import com.example.myphone.ui.components.EmptyState
@@ -59,8 +61,10 @@ import java.util.Locale
 fun CallHistoryScreen(
     navController: NavController,
     viewModel: CallHistoryViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel() // Get settings
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val avatarStyle by settingsViewModel.avatarStyle.collectAsState() // Observe style
     val context = LocalContext.current
 
     var hasCallPermission by remember {
@@ -108,6 +112,7 @@ fun CallHistoryScreen(
                 CallHistoryTopBar(
                     contactInfo = uiState.contactInfo,
                     phoneNumber = uiState.phoneNumber,
+                    avatarStyle = avatarStyle, // Pass style down
                     onNavigateBack = { navController.navigateUp() }
                 )
 
@@ -144,6 +149,7 @@ fun CallHistoryScreen(
 private fun CallHistoryTopBar(
     contactInfo: ContactInfo?,
     phoneNumber: String,
+    avatarStyle: AvatarStyle,
     onNavigateBack: () -> Unit
 ) {
     Row(
@@ -158,6 +164,7 @@ private fun CallHistoryTopBar(
         ContactAvatar(
             name = contactInfo?.name ?: phoneNumber,
             photoUri = contactInfo?.photoUri,
+            avatarStyle = avatarStyle, // Pass to avatar
             modifier = Modifier.size(40.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))

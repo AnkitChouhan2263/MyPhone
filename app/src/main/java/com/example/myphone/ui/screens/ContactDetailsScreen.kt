@@ -57,6 +57,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.myphone.features.contacts.data.ContactDetails
 import com.example.myphone.features.contacts.ui.ContactDetailsViewModel
 import com.example.myphone.features.contacts.ui.DetailsAction
+import com.example.myphone.features.settings.ui.SettingsViewModel
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 
@@ -65,9 +66,11 @@ import com.example.myphone.ui.components.ContactAvatar
 fun ContactDetailsScreen(
     navController: NavController,
     contactDetailsViewModel: ContactDetailsViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel() // Get settings
 ) {
     val uiState by contactDetailsViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val avatarStyle by settingsViewModel.avatarStyle.collectAsState() // Observe style
 
     // This is the definitive fix. This LaunchedEffect is keyed to the unique
     // navigation instance. It is GUARANTEED to run every time you navigate
@@ -176,6 +179,7 @@ fun ContactDetailsScreen(
                         ContactAvatar(
                             name = detailsToShow.name,
                             photoUri = detailsToShow.photoUri,
+                            avatarStyle = avatarStyle, // Pass to avatar
                             modifier = Modifier.size(120.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))

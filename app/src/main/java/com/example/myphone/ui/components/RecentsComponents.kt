@@ -23,9 +23,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.myphone.features.recents.data.CallLogEntry
 import com.example.myphone.features.recents.data.CallType
+import com.example.myphone.features.settings.data.AvatarStyle
+import com.example.myphone.features.settings.ui.SettingsViewModel
 import com.example.myphone.navigation.Screen
 import java.util.Calendar
 import java.util.Locale
@@ -40,10 +43,12 @@ fun CallLogList(
     navController: NavController,
     callLog: List<CallLogEntry>,
     onCall: (String, Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    settingsViewModel: SettingsViewModel = viewModel() // Get settings
 ) {
     var expandedItemId by remember { mutableStateOf<String?>(null) }
     val groupedByDate = callLog.groupBy { getDateSection(it.dateMillis) }
+    val avatarStyle by settingsViewModel.avatarStyle.collectAsState() // Observe style
 
     LazyColumn(modifier = modifier) {
         groupedByDate.forEach { (section, entries) ->
@@ -68,7 +73,8 @@ fun CallLogList(
                     },
                     onNavigateToHistory = { number ->
                         navController.navigate(Screen.CallHistory.createRoute(number))
-                    }
+                    },
+                    avatarStyle = avatarStyle // Pass style down
                 )
             }
         }
@@ -96,6 +102,7 @@ private fun CallLogItem(
     modifier: Modifier = Modifier,
     entry: CallLogEntry,
     isExpanded: Boolean,
+    avatarStyle: AvatarStyle,
     onToggleExpand: () -> Unit,
     onCall: (String, Boolean) -> Unit,
     onNavigateToDetails: (String) -> Unit,
@@ -121,6 +128,7 @@ private fun CallLogItem(
                 ContactAvatar(
                     name = avatarName,
                     photoUri = entry.photoUri,
+                    avatarStyle = avatarStyle, // Pass to avatar
                     modifier = Modifier.size(48.dp)
                 )
             }
@@ -159,7 +167,7 @@ private fun CallLogItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp, start = 64.dp),
+                    .padding( start = 64.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 Button(onClick = { onNavigateToHistory(entry.number) }) {
@@ -174,7 +182,7 @@ private fun CallLogItem(
                 }
             }
         }
-        HorizontalDivider()
+//        HorizontalDivider()
     }
 }
 

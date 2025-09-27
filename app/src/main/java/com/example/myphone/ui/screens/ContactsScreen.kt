@@ -55,6 +55,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.myphone.features.contacts.data.ContactsViewModel
+import com.example.myphone.features.settings.ui.SettingsViewModel
 import com.example.myphone.navigation.Screen
 import com.example.myphone.ui.components.ContactAvatar
 import com.example.myphone.ui.components.EmptyState
@@ -62,7 +63,8 @@ import com.example.myphone.ui.components.EmptyState
 @Composable
 fun ContactsScreen(
     navController: NavController,
-    contactsViewModel: ContactsViewModel = viewModel()
+    contactsViewModel: ContactsViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel() // Get settings
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -107,6 +109,7 @@ fun ContactsScreen(
 
     val uiState by contactsViewModel.uiState.collectAsState()
     val searchQuery by contactsViewModel.searchQuery.collectAsState()
+    val avatarStyle by settingsViewModel.avatarStyle.collectAsState() // Observe avatar style
 
     // This state now holds the last successful list to prevent blinking on refresh.
     var lastSuccessData by remember { mutableStateOf<List<ContactsViewModel.ContactSearchResult>?>(null) }
@@ -164,7 +167,8 @@ fun ContactsScreen(
                             results = dataToShow,
                             onContactClick = { contactId ->
                                 navController.navigate(Screen.ContactDetails.createRoute(contactId))
-                            }
+                            },
+                            avatarStyle = avatarStyle // Pass avatar style down
                         )
                     } else {
                         // Handle empty list and no search results scenarios
@@ -212,7 +216,8 @@ fun ContactsScreen(
 @Composable
 fun ContactsList(
     results: List<ContactsViewModel.ContactSearchResult>,
-    onContactClick: (String) -> Unit
+    onContactClick: (String) -> Unit,
+    avatarStyle: com.example.myphone.features.settings.data.AvatarStyle // Accept avatar style
 ) {
     // UPDATED: Get a list of favorites, but don't remove them from the main list.
     val favoriteResults = results.filter { it.contact.isFavorite }
@@ -226,7 +231,8 @@ fun ContactsList(
             items(favoriteResults, key = { "${it.contact.id}-fav-${it.matchedNumber}" }) { result ->
                 ContactListItem(
                     result = result,
-                    onClick = { onContactClick(result.contact.id) }
+                    onClick = { onContactClick(result.contact.id) },
+                    avatarStyle = avatarStyle // Pass to item
                 )
             }
         }
@@ -240,7 +246,8 @@ fun ContactsList(
             items(results, key = { "${it.contact.id}-reg-${it.matchedNumber}" }) { result ->
                 ContactListItem(
                     result = result,
-                    onClick = { onContactClick(result.contact.id) }
+                    onClick = { onContactClick(result.contact.id) },
+                    avatarStyle = avatarStyle // Pass to item
                 )
             }
         }
@@ -266,7 +273,8 @@ fun SectionHeader(title: String) {
 @Composable
 fun ContactListItem(
     result: ContactsViewModel.ContactSearchResult,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    avatarStyle: com.example.myphone.features.settings.data.AvatarStyle // Accept avatar style
 ) {
     Row(
         modifier = Modifier
@@ -280,6 +288,7 @@ fun ContactListItem(
         ContactAvatar(
             name = result.contact.name,
             photoUri = result.contact.photoUri,
+            avatarStyle = avatarStyle, // Pass to avatar
             modifier = Modifier.size(48.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))

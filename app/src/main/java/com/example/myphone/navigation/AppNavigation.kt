@@ -1,35 +1,19 @@
 package com.example.myphone.navigation
 
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dialpad
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import androidx.navigation.navArgument
-import com.example.myphone.ui.screens.AddContactScreen
-import com.example.myphone.ui.screens.CallHistoryScreen
-import com.example.myphone.ui.screens.ContactDetailsScreen
-import com.example.myphone.ui.screens.ContactsScreen
-import com.example.myphone.ui.screens.DialerScreen
-import com.example.myphone.ui.screens.EditContactScreen
-import com.example.myphone.ui.screens.HomeScreen
-
-//import com.example.myphone.ui.screens.RecentsScreen
+import com.example.myphone.ui.screens.*
+import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -48,6 +32,7 @@ sealed class Screen(val route: String) {
     object ContactDetails : Screen("contacts/{contactId}") {
         fun createRoute(contactId: String) = "contacts/$contactId"
     }
+    object Settings : Screen("settings")
 }
 
 val bottomNavItems = listOf(
@@ -61,53 +46,76 @@ data class BottomNavItem(val route: String, val label: String, val icon: ImageVe
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    Scaffold(
-        bottomBar = { AppBottomNavigationBar(navController = navController) }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Home.route) { HomeScreen(
-                navController = navController
-            ) }
-//            composable(Screen.Recents.route) { RecentsScreen(
-//                navController = navController
-//            ) }
-            composable(Screen.Dialer.route) { DialerScreen() }
-            composable(Screen.Contacts.route) {
-                ContactsScreen(navController = navController)
-            }
-            // NEW: Separate composable destinations.
-            composable(Screen.AddContact.route) {
-                AddContactScreen(navController = navController)
-            }
-            composable(
-                route = Screen.EditContact.route,
-                arguments = listOf(navArgument("contactId") { type = NavType.StringType })
-            ) { backStackEntry ->
-                EditContactScreen(
-                    navController = navController,
-                    backStackEntry = backStackEntry
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(12.dp))
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.Settings.route)
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
             }
-            // NEW: Add the call history screen to the navigation graph.
-            // For now, it will show a placeholder.
-            composable(
-                route = Screen.CallHistory.route,
-                arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType })
+        }
+    ) {
+        Scaffold(
+            bottomBar = { AppBottomNavigationBar(navController = navController) }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Home.route,
+                modifier = Modifier.padding(innerPadding)
             ) {
-                // Replace the placeholder with the real screen.
-                CallHistoryScreen(navController = navController)
-            }
-            composable(
-                route = Screen.ContactDetails.route,
-                arguments = listOf(navArgument("contactId") {
-                    type = NavType.StringType
-                })
-            ) {
-                ContactDetailsScreen(navController = navController)
+                composable(Screen.Home.route) {
+                    HomeScreen(
+                        navController = navController,
+                        onMenuClick = {
+                            scope.launch { drawerState.open() }
+                        }
+                    )
+                }
+                composable(Screen.Dialer.route) { DialerScreen() }
+                composable(Screen.Contacts.route) {
+                    ContactsScreen(navController = navController)
+                }
+                composable(Screen.AddContact.route) {
+                    AddContactScreen(navController = navController)
+                }
+                composable(
+                    route = Screen.EditContact.route,
+                    arguments = listOf(navArgument("contactId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    EditContactScreen(
+                        navController = navController,
+                        backStackEntry = backStackEntry
+                    )
+                }
+                composable(
+                    route = Screen.CallHistory.route,
+                    arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType })
+                ) {
+                    CallHistoryScreen(navController = navController)
+                }
+                composable(
+                    route = Screen.ContactDetails.route,
+                    arguments = listOf(navArgument("contactId") {
+                        type = NavType.StringType
+                    })
+                ) {
+                    ContactDetailsScreen(navController = navController)
+                }
+                composable(Screen.Settings.route) {
+                    SettingsScreen(navController = navController)
+                }
             }
         }
     }

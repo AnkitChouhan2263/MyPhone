@@ -20,12 +20,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,6 +60,7 @@ enum class HomeFilter(val label: String) {
 @Composable
 fun HomeScreen(
     navController: NavController,
+    onMenuClick: () -> Unit, // New parameter to open the drawer
     recentsViewModel: RecentsViewModel = viewModel(),
 ) {
     val recentsState by recentsViewModel.uiState.collectAsState()
@@ -104,7 +108,8 @@ fun HomeScreen(
         ) {
 //            Spacer(modifier = Modifier.height(16.dp))
             SearchBar(
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onMenuClick = onMenuClick // Pass the click handler down
             )
 //            Spacer(modifier = Modifier.height(16.dp))
             Filter(
@@ -195,11 +200,14 @@ fun HomeScreen(
 
 // These composables are specific to the HomeScreen's UI, so they remain here.
 /**
- * THE FIX: This is the missing SearchBar composable.
- * It is now correctly declared within the HomeScreen.kt file.
+ * An enhanced SearchBar that is not a real text field, but a clickable surface
+ * that includes a placeholder and a settings icon.
  */
 @Composable
-private fun SearchBar(modifier: Modifier = Modifier) {
+private fun SearchBar(
+    modifier: Modifier = Modifier,
+    onMenuClick: () -> Unit = { /* TODO: Navigate to a dedicated search screen */ }
+) {
     OutlinedTextField(
         value = "",
         onValueChange = {},
@@ -207,7 +215,14 @@ private fun SearchBar(modifier: Modifier = Modifier) {
         readOnly = true,
         enabled = false, // Display only, not functional yet
         placeholder = { Text("Search contacts & places") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+        leadingIcon = {
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Open Menu",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+        } },
         shape = RoundedCornerShape(50),
         interactionSource = remember { MutableInteractionSource() }
             .also { interactionSource ->
